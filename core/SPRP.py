@@ -1,6 +1,7 @@
 from typing import io
 import os, glob, re
 import core.utils as ut
+#from .TX2D import TX2D
 from .VBUF import VBUF
 from .MTRL import MTRL
 from .SCNE import SCNE_MODEL
@@ -370,6 +371,8 @@ class SPRPDataEntry:
                     data_object = SCNE_MODEL('', b'', self.string_table)
                 else:
                     raise Exception("unknown SCNE Object")
+            elif self.type == b'TX2D':
+                data_object = TX2D('', self.name, self.string_table)
             else:
                 data_object = eval(self.type)('', b'', self.string_table)
             data_object.read(stream, self.data_offset)
@@ -419,6 +422,10 @@ class SPRPDataEntry:
         try:
             self.data.write(stream)
         except Exception as e:
+            import traceback
+            traceback.print_exc()
+            print(e)
+            #exit()
             if hasattr(self, 'data'):
                 stream.seek(self.data_offset + self.offset)
                 stream.write(self.data)
@@ -551,5 +558,6 @@ class SPRPDataEntry:
             f'size: {self.size}\n'
             f'offset: {hex(self.offset)}\n'
             f'data_class: {self.data.__class__.__name__}\n'
+            f'data: {self.data}\n'
             f'children: {self.children}\n'
         )

@@ -8,3 +8,5 @@ platforms = {
 
 selected_game = 'dbrb'
 selected_platform = 'ps3'
+
+keep_normals = False

@@ -2,20 +2,17 @@ import sys
 from PyQt5 import QtGui, QtWidgets
 from PyQt5.QtWidgets import QFileDialog
 from ui.handlers.MainWindowHandler import MainWindowHandler
+from ui.handlers.ModelWindowHandler import ModelWindowHandler
+from ui.handlers.TextureWindowHandler import TextureWindowHandler
+from ui.handlers.MaterialWindowHandler import MaterialWindowHandler
 
 class ViewHandler():
-    def init(self, callback = None):
-        self.app = QtWidgets.QApplication([])
-        self.resetWindow()
-        self.main_window = MainWindowHandler(self.window)
-        self.initObservers()
-        self.attachObservers()
-        self.main_window.load()
-        self.window.setWindowTitle("RB Character Editor - by Ascomods")
-        if callback != None:
-            eval(callback['name'])(callback['parameters'])
-        self.window.show()
-        sys.exit(self.app.exec_())
+    observers = {}
+
+    def init(self, callbacks = None):
+        if callbacks != None:
+            for function, params in callbacks.items():
+                eval(function)(params)
 
     def resetWindow(self):
         if hasattr(self, 'window'):
@@ -24,24 +21,40 @@ class ViewHandler():
     
     def disableElements(self, elements):
         for elt in elements:
-            eval(f"self.main_window.ui.{elt}").setEnabled(False)
+            eval(f"self.window_handler.ui.{elt}").setEnabled(False)
 
     def enableElements(self, elements):
         for elt in elements:
-            eval(f"self.main_window.ui.{elt}").setEnabled(True)
-
-    def initObservers(self):
-        if not hasattr(self, 'observers'):
-            self.observers = {}
+            eval(f"self.window_handler.ui.{elt}").setEnabled(True)
     
-    def attachObservers(self):
-        for key, val in self.observers.items():
-            eval(f"self.{key}").add_observer(val, identify_observed=True)
+    def addObservers(self, observers):
+        self.observers = {**self.observers, **observers}
 
-    def addEntries(self, view, listModel, entries):
+    def attachObservers(self):
+        for window_class, functions in self.observers.items():
+            for function, observer in functions.items():
+                if self.window_handler.__class__.__name__ == window_class:
+                    eval(f"self.window_handler.{function}").add_observer(observer, identify_observed=True)
+
+    def addEntries(self, listModel, entries):
         for entry in entries:
-            eval(f"self.{view}.{listModel}").appendRow(QtGui.QStandardItem(entry))
-        self.main_window.ui.statusbar.showMessage(f"{len(entries)} entries found")
+            eval(f"self.window_handler.{listModel}").appendRow(QtGui.QStandardItem(entry))
+        self.window_handler.ui.statusbar.showMessage(f"{len(entries)} entries found")
+    
+    def loadWindow(self, handler_class, callbacks = None):
+        if hasattr(self, 'window'):
+            self.parent = self.window
+            self.window = QtWidgets.QMainWindow(self.parent)
+        else:
+            self.window = QtWidgets.QMainWindow()
+        self.window_handler = eval(handler_class)(self.window)
+        self.attachObservers()
+        self.window_handler.load()
+        self.window.setWindowTitle("RB Editor - by Ascomods")
+        if callbacks != None:
+            for function, params in callbacks.items():
+                eval(function)(params)
+        self.window.show()
     
     def showMessageDialog(self, message, type = 'information', title = ''):
         """
@@ -55,7 +68,7 @@ class ViewHandler():
         return False
     
     def setStatusBarMessage(self, message):
-        self.main_window.ui.statusbar.showMessage(message)
+        self.window_handler.ui.statusbar.showMessage(message)
     
     def openFileDialog(self, type = 'file', title = 'Open', filter = ''):
         if type == 'folder':

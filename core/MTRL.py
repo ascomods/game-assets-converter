@@ -8,6 +8,7 @@ class MTRL:
     def __init__(self, type = '', name = b'', string_table = ''):
         if type == '':
             self.type = self.__class__.__name__
+        self.data_size = 0
         self.name = name
         self.string_table = string_table
         self.has_info = False
@@ -57,7 +58,8 @@ class MTRL:
                 pass
 
     def write(self, stream: io, write_data = True):
-
+        if not hasattr(self, 'offset'):
+            self.offset = stream.tell() - self.data_offset
         if self.has_info:
             stream.write(ut.i2b(self.name_offset))
             stream.write(ut.i2b(self.offset))
@@ -86,6 +88,7 @@ class MTRL:
         stream.write(bytes(trailing_zeros))
 
     def load(self):
+        print(self.data_offset)
         is_dir = False
         if os.path.isdir(self.name):
             os.chdir(self.name)
@@ -99,10 +102,11 @@ class MTRL:
         self.data = data.read()
         self.data_size = ut.get_file_size("data")
 
-        layers_data_lines = open("data.txt", 'r').read().splitlines()
-        for i in range (0, len(layers_data_lines) - 1, 2):
-            self.layers.append([ut.s2b_name(layers_data_lines[i]), 
-                ut.s2b_name(layers_data_lines[i + 1])])
+        if os.path.exists("data.txt"):
+            layers_data_lines = open("data.txt", 'r').read().splitlines()
+            for i in range (0, len(layers_data_lines) - 1, 2):
+                self.layers.append([ut.s2b_name(layers_data_lines[i]), 
+                    ut.s2b_name(layers_data_lines[i + 1])])
 
         if self.name != b'':
             self.name_offset = ut.search_index_dict(self.string_table.content, self.name)
@@ -120,14 +124,19 @@ class MTRL:
         output = open(data_path, 'wb')
         output.write(self.data)
 
-        layers_decl_data_path = path + 'data.txt'
-        output = open(layers_decl_data_path, 'a')
-        for layer in self.layers:
-            output.write(f'{ut.b2s_name(layer[0])}\n')
-            output.write(f'{ut.b2s_name(layer[1])}\n')
+        if len(self.layers) > 0:
+            layers_decl_data_path = path + 'data.txt'
+            output = open(layers_decl_data_path, 'a')
+            for layer in self.layers:
+                output.write(f'{ut.b2s_name(layer[0])}\n')
+                output.write(f'{ut.b2s_name(layer[1])}\n')
 
     def __repr__(self):
         return (
             f'\nclass: {self.__class__.__name__}\n'
             f'name: {self.name}\n'
+            f'data_size: {self.data_size}\n'
+            f'data_offset: {self.data_offset}\n'
+            f'offset: {self.offset}\n'
+            f'layers: {self.layers}\n'
         )

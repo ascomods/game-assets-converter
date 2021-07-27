@@ -13,16 +13,9 @@ class MainWindowHandler(QWidget):
     def load(self):
         self.ui = Ui_MainWindow()
         self.ui.setupUi(self.window)
-        self.initUi()
-        self.ui.gameCmbBox.currentIndexChanged.connect(self.gameSelectAction)
-        self.ui.platformCmbBox.currentIndexChanged.connect(self.platformSelectAction)
-        self.ui.contentListView.selectionModel().selectionChanged.connect(self.contentListSelectAction)
-        self.ui.openBtn.clicked.connect(self.notifyOpenAction)
-        self.ui.saveBtn.clicked.connect(self.notifySaveAction)
-        self.ui.saveAsBtn.clicked.connect(self.notifySaveAsAction)
-        self.ui.disableBtn.clicked.connect(self.disableAction)
-        self.ui.importBtn.clicked.connect(self.importAction)
-        self.ui.exportBtn.clicked.connect(self.exportAction)
+        self.ui.modelBtn.clicked.connect(self.notifyModelEditAction)
+        self.ui.textureBtn.clicked.connect(self.notifyTextureEditAction)
+        self.ui.materialBtn.clicked.connect(self.notifyMaterialEditAction)
     
     def initUi(self):
         # game combo box
@@ -55,56 +48,17 @@ class MainWindowHandler(QWidget):
         self.ui.exportBtn.setIcon(qta.icon('fa5s.file-export', color='white'))
         self.ui.exportBtn.setToolTip("Export")
 
-    @QtCore.pyqtSlot()
-    def gameSelectAction(self):
-        cm.selected_game = list(cm.games.keys())[self.ui.gameCmbBox.currentIndex()]
-
-    @QtCore.pyqtSlot()
-    def platformSelectAction(self):
-        cm.selected_platform = list(cm.platforms.keys())[self.ui.platformCmbBox.currentIndex()]
-    
     @observable_method()
     @QtCore.pyqtSlot()
-    def notifyOpenAction(self, arg):
-        self.contentModel.clear()
-
-    @observable_method()
-    @QtCore.pyqtSlot()
-    def notifySaveAction(self, arg):
+    def notifyModelEditAction(self, arg):
         pass
 
     @observable_method()
     @QtCore.pyqtSlot()
-    def notifySaveAsAction(self, arg):
+    def notifyTextureEditAction(self, arg):
         pass
 
-    @QtCore.pyqtSlot()
-    def disableAction(self):
-        selectedIndexes = self.ui.contentListView.selectedIndexes()
-        self.notifyDisableAction([x.data() for x in selectedIndexes])
-
     @observable_method()
-    def notifyDisableAction(self, selectedItems):
-        pass
-
     @QtCore.pyqtSlot()
-    def importAction(self):
-        selectedIndexes = self.ui.contentListView.selectedIndexes()
-        self.notifyImportAction([x.data() for x in selectedIndexes])
-
-    @observable_method()
-    def notifyImportAction(self, selectedItems):
-        pass
-
-    @QtCore.pyqtSlot()
-    def contentListSelectAction(self):
-        self.ui.statusbar.showMessage(f"{len(self.ui.contentListView.selectedIndexes())} entries selected")
-    
-    @QtCore.pyqtSlot()
-    def exportAction(self):
-        selectedIndexes = self.ui.contentListView.selectedIndexes()
-        self.notifyExportAction([x.data() for x in selectedIndexes])
-    
-    @observable_method()
-    def notifyExportAction(self, selectedItems):
+    def notifyMaterialEditAction(self, arg):
         pass
