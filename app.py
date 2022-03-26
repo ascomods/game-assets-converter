@@ -1,9 +1,9 @@
 import handlers.MainHandler as mh
-import core.utils as ut
-import os, sys
+import sys
 from PyQt5 import QtWidgets
 
 if __name__ == "__main__":
+    main_handler = mh.MainHandler()
     app = QtWidgets.QApplication([])
-    mh.MainHandler()
+    main_handler.init()
     sys.exit(app.exec_())

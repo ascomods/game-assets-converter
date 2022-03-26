@@ -1,64 +1,61 @@
-from PyQt5 import QtCore, QtGui
+from PyQt5 import QtCore
 from PyQt5.QtWidgets import QWidget
 import qtawesome as qta
+from ui.handlers.WindowHandler import WindowHandler
 from ui.views.MainWindow import Ui_MainWindow
 from observed import observable_method
 import core.common as cm
 
-class MainWindowHandler(QWidget):
-    def __init__(self, window):
-        super().__init__()
-        self.window = window
+class MainWindowHandler(WindowHandler, QWidget):
+    toggleable_elements = [
+        'minimize_btn',
+        'exit_btn',
+        'game_cmb_box',
+        'platform_cmb_box',
+        'import_btn',
+        'export_btn'
+    ]
 
     def load(self):
         self.ui = Ui_MainWindow()
         self.ui.setupUi(self.window)
-        self.ui.modelBtn.clicked.connect(self.notifyModelEditAction)
-        self.ui.textureBtn.clicked.connect(self.notifyTextureEditAction)
-        self.ui.materialBtn.clicked.connect(self.notifyMaterialEditAction)
+        self.init_ui()
+        self.ui.game_cmb_box.currentIndexChanged.connect(self.game_select_action)
+        self.ui.platform_cmb_box.currentIndexChanged.connect(self.platform_select_action)
+        self.ui.import_btn.clicked.connect(self.notify_import_action)
+        self.ui.export_btn.clicked.connect(self.notify_export_action)
     
-    def initUi(self):
+    def init_ui(self):
+        super().init_ui()
+
         # game combo box
         for key, val in cm.games.items():
-            self.ui.gameCmbBox.addItem(val)
-        gameIdx = list(cm.games.keys()).index(cm.selected_game)
-        self.ui.gameCmbBox.setCurrentIndex(gameIdx)
+            self.ui.game_cmb_box.addItem(val)
+        game_idx = list(cm.games.keys()).index(cm.selected_game)
+        self.ui.game_cmb_box.setCurrentIndex(game_idx)
 
         # platform combo box
         for key, val in cm.platforms.items():
-            self.ui.platformCmbBox.addItem(val)
-        platformIdx = list(cm.platforms.keys()).index(cm.selected_platform)
-        self.ui.platformCmbBox.setCurrentIndex(platformIdx)
-
-        # content list
-        self.contentModel = QtGui.QStandardItemModel()
-        self.ui.contentListView.setModel(self.contentModel)
+            self.ui.platform_cmb_box.addItem(val)
+        platform_idx = list(cm.platforms.keys()).index(cm.selected_platform)
+        self.ui.platform_cmb_box.setCurrentIndex(platform_idx)
 
         # actions buttons
-        self.ui.openBtn.setIcon(qta.icon('fa5s.folder-open', color='white'))
-        self.ui.openBtn.setToolTip("Open")
-        self.ui.saveBtn.setIcon(qta.icon('fa.save', color='white'))
-        self.ui.saveBtn.setToolTip("Save")
-        self.ui.saveAsBtn.setIcon(qta.icon('mdi.content-save-all', color='white'))
-        self.ui.saveAsBtn.setToolTip("Save As")
-        self.ui.disableBtn.setIcon(qta.icon('ei.ban-circle', color='white'))
-        self.ui.disableBtn.setToolTip("Disable Parts")
-        self.ui.importBtn.setIcon(qta.icon('fa5s.file-import', color='white'))
-        self.ui.importBtn.setToolTip("Import")
-        self.ui.exportBtn.setIcon(qta.icon('fa5s.file-export', color='white'))
-        self.ui.exportBtn.setToolTip("Export")
+        self.ui.import_btn.setIcon(qta.icon('fa5s.file-import', color='white'))
+        self.ui.export_btn.setIcon(qta.icon('fa5s.file-export', color='white'))
+    
+    @QtCore.pyqtSlot()
+    def game_select_action(self):
+        cm.selected_game = list(cm.games.keys())[self.ui.game_cmb_box.currentIndex()]
+
+    @QtCore.pyqtSlot()
+    def platform_select_action(self):
+        cm.selected_platform = list(cm.platforms.keys())[self.ui.platform_cmb_box.currentIndex()]
 
     @observable_method()
-    @QtCore.pyqtSlot()
-    def notifyModelEditAction(self, arg):
+    def notify_import_action(self, arg):
         pass
 
     @observable_method()
-    @QtCore.pyqtSlot()
-    def notifyTextureEditAction(self, arg):
-        pass
-
-    @observable_method()
-    @QtCore.pyqtSlot()
-    def notifyMaterialEditAction(self, arg):
+    def notify_export_action(self, arg):
         pass

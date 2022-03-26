@@ -1,70 +1,47 @@
 import os
-import core.common as cm
+import struct
 
 class TGA:
-    supported_data = [
-        'positions',
-        'normals',
-        'uvs'
-    ]
+    def __init__(self, name, width, height, data):
+        self.name = name
+        # Header
+        self.id_length = 0
+        self.color_map_type = 0
+        self.image_type = 2
+        # Colormap specification
+        self.first_index_entry = 0
+        self.color_map_length = 0
+        self.color_map_entry_size = 0
+        # Image specification
+        self.x_origin = 0
+        self.y_origin = 0
+        self.width = width
+        self.height = height
+        self.pixel_depth = 32
+        self.image_descriptor = 0
+        self.data = data
+    
+    def write(self, stream):
+        stream.write(struct.pack('B', self.id_length))
+        stream.write(struct.pack('B', self.color_map_type))
+        stream.write(struct.pack('B', self.image_type))
 
-    def __init__(self):
-        self.data = {
-            'positions': [],
-            'normals': [],
-            'uvs': []
-        }
+        stream.write(struct.pack('h', self.first_index_entry))
+        stream.write(struct.pack('h', self.color_map_length))
+        stream.write(struct.pack('B', self.color_map_entry_size))
 
-    def load(self, path):
-        stream = open(path + 'data.obj', 'r')
-        lines = stream.readlines()
-        
-        data = [x.split()[1:] for x in lines if x.startswith('v ')]
-        [x.append('1.0') for x in data if len(x) == 3]
-        data = [tuple(x) for x in data]
-
-        self.data['positions'].append(
-            {'data': data}
-        )
-
-        if not cm.keep_normals:
-            data = [x.split()[1:] for x in lines if x.startswith('vn ')]
-            [x.append('0.0') for x in data if len(x) == 3]
-            data = [tuple(x) for x in data]
-
-            self.data['normals'].append(
-                {'data': data}
-            )
-        
-        self.data['uvs'].append(
-            {'data': [tuple(x.split()[1:]) for x in lines if x.startswith('vt ')]}
-        )
+        stream.write(struct.pack('h', self.x_origin))
+        stream.write(struct.pack('h', self.y_origin))
+        stream.write(struct.pack('h', self.width))
+        stream.write(struct.pack('h', self.height))
+        stream.write(struct.pack('B', self.pixel_depth))
+        stream.write(struct.pack('B', self.image_descriptor))
+        stream.write(self.data)
 
     def save(self, path):
-        stream = open(path + 'data.obj', 'w')
-
-        stream.write(f"o {os.path.basename(path)}\n")
+        if not os.path.exists(path):
+            os.mkdir(path)
         
-        for vtx in self.data['positions'][0]['data']:
-            stream.write(f"v {vtx[0]} {vtx[1]} {vtx[2]} {vtx[3]}\n")
-        
-        for norm in self.data['normals'][0]['data']:
-            stream.write(f"vn {norm[0]} {norm[1]} {norm[2]} {norm[3]}\n")
-        
-        for uvs in self.data['uvs'][0]['data']:
-            stream.write(f"vt {uvs[0]} {uvs[1]}\n")
-        
-        flip = True
-
-        for i in range(1, len(self.data['positions'][0]['data']) - 1):
-            if flip:
-                if cm.keep_normals:
-                    stream.write(f"f {i}/{i}/{i} {i+1}/{i+1}/{i+1} {i+2}/{i+2}/{i+2}\n")
-                else:
-                    stream.write(f"f {i}/{i} {i+1}/{i+1} {i+2}/{i+2}\n")
-            else:
-                if cm.keep_normals:
-                    stream.write(f"f {i}/{i}/{i} {i+2}/{i+2}/{i+2} {i+1}/{i+1}/{i+1}\n")
-                else:
-                    stream.write(f"f {i}/{i} {i+2}/{i+2} {i+1}/{i+1}\n")
-            flip = not flip
+        stream = open(f"{path}/{self.name}.tga", 'wb')
+        self.write(stream)
+        stream.close()

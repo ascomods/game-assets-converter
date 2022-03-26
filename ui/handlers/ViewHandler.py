@@ -1,10 +1,10 @@
-import sys
+from stat import filemode
 from PyQt5 import QtGui, QtWidgets
 from PyQt5.QtWidgets import QFileDialog
+from ui.handlers.ListWindowHandler import ListWindowHandler
 from ui.handlers.MainWindowHandler import MainWindowHandler
-from ui.handlers.ModelWindowHandler import ModelWindowHandler
-from ui.handlers.TextureWindowHandler import TextureWindowHandler
-from ui.handlers.MaterialWindowHandler import MaterialWindowHandler
+from ui.handlers.ProgressWindowHandler import ProgressWindowHandler
+from ui.handlers.MessageWindowHandler import MessageWindowHandler
 
 class ViewHandler():
     observers = {}
@@ -14,67 +14,75 @@ class ViewHandler():
             for function, params in callbacks.items():
                 eval(function)(params)
 
-    def resetWindow(self):
+    def close_window(self, return_to_parent = True):
         if hasattr(self, 'window'):
             self.window.close()
-        self.window = QtWidgets.QMainWindow()
+        if return_to_parent:
+            if hasattr(self, 'parent_handler'):
+                self.window_handler = self.parent_handler
+                self.window = self.parent_handler.window
+                self.enable_elements()
     
-    def disableElements(self, elements):
-        for elt in elements:
-            eval(f"self.window_handler.ui.{elt}").setEnabled(False)
+    def disable_elements(self, elements = []):
+        self.window_handler.disable_elements(elements)
 
-    def enableElements(self, elements):
-        for elt in elements:
-            eval(f"self.window_handler.ui.{elt}").setEnabled(True)
-    
-    def addObservers(self, observers):
+    def enable_elements(self, elements = []):
+        self.window_handler.enable_elements(elements)
+
+    def set_entries(self, list_model, entries):
+        eval(f"self.window_handler.{list_model}").clear()
+        for entry in entries:
+            eval(f"self.window_handler.{list_model}") \
+                .appendRow(QtGui.QStandardItem(entry))
+
+    def add_observers(self, observers):
         self.observers = {**self.observers, **observers}
 
-    def attachObservers(self):
+    def attach_observers(self):
         for window_class, functions in self.observers.items():
             for function, observer in functions.items():
                 if self.window_handler.__class__.__name__ == window_class:
-                    eval(f"self.window_handler.{function}").add_observer(observer, identify_observed=True)
+                    eval(f"self.window_handler.{function}").add_observer(observer, 
+                        identify_observed=True)
+                else:
+                    for parent in self.window_handler.__class__.__bases__:
+                        if parent.__name__ == window_class:
+                            eval(f"self.window_handler.{function}").add_observer(observer, 
+                                identify_observed=True)
+                            break
 
-    def addEntries(self, listModel, entries):
-        for entry in entries:
-            eval(f"self.window_handler.{listModel}").appendRow(QtGui.QStandardItem(entry))
-        self.window_handler.ui.statusbar.showMessage(f"{len(entries)} entries found")
-    
-    def loadWindow(self, handler_class, callbacks = None):
-        if hasattr(self, 'window'):
-            self.parent = self.window
-            self.window = QtWidgets.QMainWindow(self.parent)
+    def load_window(self, handler_class, is_child = True, title = '', callbacks = None):
+        if hasattr(self, 'window_handler'):
+            self.parent_handler = self.window_handler
+        if hasattr(self, 'window') and is_child:
+            self.window = QtWidgets.QMainWindow(self.window)
         else:
             self.window = QtWidgets.QMainWindow()
-        self.window_handler = eval(handler_class)(self.window)
-        self.attachObservers()
+        self.window_handler = eval(handler_class)(self.window, title)
+        self.attach_observers()
         self.window_handler.load()
-        self.window.setWindowTitle("RB Editor - by Ascomods")
         if callbacks != None:
             for function, params in callbacks.items():
                 eval(function)(params)
         self.window.show()
     
-    def showMessageDialog(self, message, type = 'information', title = ''):
+    def show_message_dialog(self, message, type = 'information', title = '', 
+        callback = None, yes_no = False):
         """
         Possible types : 'information', 'warning', 'critical', 'question'
         """
-        if title == '':
-            title = type.title()
-        res = eval(f"QtWidgets.QMessageBox.{type}")(None, title, message)
-        if type == 'question':
-            return res == QtWidgets.QMessageBox.Yes
-        return False
+        self.load_window('MessageWindowHandler')
+        self.window_handler.set_message(type, title, message, yes_no)
+        if callback != None:
+            self.window_handler.set_callback(callback)
     
-    def setStatusBarMessage(self, message):
-        self.window_handler.ui.statusbar.showMessage(message)
-    
-    def openFileDialog(self, type = 'file', title = 'Open', filter = ''):
+    def open_file_dialog(self, type = 'file', title = 'Open', filter = '', multiple = False):
         if type == 'folder':
             method = "getExistingDirectory"
         elif type == 'save-file':
             method = "getSaveFileName"
+        elif multiple:
+            method = "getOpenFileNames"
         else:
             method = "getOpenFileName"
         if type != 'folder':

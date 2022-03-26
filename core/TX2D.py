@@ -1,7 +1,5 @@
-from typing import io
-import os, re
 import core.utils as ut
-from .TGA import TGA
+import struct
 
 class TX2D:
     info_size = 36
@@ -10,16 +8,17 @@ class TX2D:
         if type == '':
             self.type = self.__class__.__name__
         self.name = name
+        self.unknown0x00 = 2
+        self.unknown0x08 = 0
+        self.depth = 1
+        self.mipmap_count = 1
+        self.unknown0x18 = 0
         self.string_table = string_table
-
-    def update_offsets(self, data_offset, offset):
-        self.data_offset = data_offset
-        self.offset = ut.add_padding(offset)
 
     def get_size(self, specific_include = True):
         return self.info_size
     
-    def read(self, stream: io, data_offset = 0):
+    def read(self, stream, data_offset = 0):
         # Reading data info
         self.data_offset = data_offset
         self.unknown0x00 = ut.b2i(stream.read(4))
@@ -28,85 +27,76 @@ class TX2D:
         self.vram_data_size = ut.b2i(stream.read(4))
         self.width = ut.b2i(stream.read(2))
         self.height = ut.b2i(stream.read(2))
-        self.unknown0x14 = ut.b2i(stream.read(2))
-        self.mipmapCount = ut.b2i(stream.read(2))
+        self.depth = ut.b2i(stream.read(2))
+        self.mipmap_count = ut.b2i(stream.read(2))
         self.unknown0x18 = ut.b2i(stream.read(4))
         self.unknown0x1C = ut.b2i(stream.read(4))
-        self.unknown0x20 = ut.b2i(stream.read(4))
+        self.texture_type = ut.b2i(stream.read(4))
 
-    def read_vram(self, stream: io):
-        stream.seek(self.vram_data_offset)
-        self.vram_data = stream.read(self.vram_data_size)
-    
-    def get_vram(self):
-        return self.vram_data
-
-    def write(self, stream: io, write_data = True):
+    def write(self, stream, write_data = True):
         stream.write(ut.i2b(self.unknown0x00))
         stream.write(ut.i2b(self.vram_data_offset))
         stream.write(ut.i2b(self.unknown0x08))
-        stream.write(ut.i2b(self.vram_data_size))
-        stream.write(ut.i2b(self.width))
-        stream.write(ut.i2b(self.height))
-        stream.write(ut.i2b(self.unknown0x14))
-        stream.write(ut.i2b(self.mipmapCount))
+        stream.write(ut.i2b(len(self.vram_data)))
+        stream.write(ut.i2b(self.width, 2))
+        stream.write(ut.i2b(self.height, 2))
+        stream.write(ut.i2b(self.depth, 2))
+        stream.write(ut.i2b(self.mipmap_count, 2))
         stream.write(ut.i2b(self.unknown0x18))
         stream.write(ut.i2b(self.unknown0x1C))
-        stream.write(ut.i2b(self.unknown0x20))
+        stream.write(ut.i2b(self.texture_type))
+        return stream.tell()
 
-    def load(self):
-        is_dir = False
-        if os.path.isdir(self.name):
-            os.chdir(self.name)
-            is_dir = True
-        elif os.path.isdir("data"):
-            os.chdir("data")
-            is_dir = True
+    def read_vram(self, stream):
+        stream.seek(self.vram_data_offset)
+        self.vram_data = stream.read(self.vram_data_size)
 
-        self.name = ut.s2b_name(re.sub('^\[\d+\]', '', ut.b2s_name(self.name)))
-        data = open("data", "rb")
-        self.data = data.read()
-        self.data_size = ut.get_file_size("data")
+    def get_vram(self):
+        return self.vram_data
+    
+    def get_texture_type(self):
+        if hex(self.texture_type) == '0x8000000':
+            return 'DXT1'
+        elif (hex(self.texture_type) == '0x18000000') or (hex(self.texture_type) == '0x20000000'):
+            return 'DXT5'
+        elif self.texture_type == 0: # r8g8b8a8_typeless
+            return '27'
+        return '0'
 
-        layers_data_lines = open("data.txt", 'r').read().splitlines()
-        for i in range (0, len(layers_data_lines) - 1, 2):
-            self.layers.append([ut.s2b_name(layers_data_lines[i]), 
-                ut.s2b_name(layers_data_lines[i + 1])])
+    def get_swizzled_vram_data(self):
+        data = self.vram_data
+        if self.get_texture_type() == '27':
+            data = bytearray()
+            for i in range(0, len(self.vram_data), 4):
+                elt = self.vram_data[i:i+4]
+                # Swap bytes
+                data.extend(struct.pack("<I", struct.unpack(">I", elt)[0]))
+        return data
 
-        if self.name != b'':
-            self.name_offset = ut.search_index_dict(self.string_table.content, self.name)
-
-        if is_dir:
-            os.chdir("..")
-
-    def save(self, path):
-        if not os.path.exists(path):
-            os.mkdir(path)
-
-        output_object = TGA()
-        output_object.data = self.data
-        output_object.save(path)
-
-        self.save_info_data(path, output_object.__class__.__name__)
-
-    def save(self, path, name = ''):
-        if self.has_info:
-            path += ut.b2s_name(self.name) + '/'
-        if not os.path.exists(path):
-            os.mkdir(path)
-        
-        data_path = path + 'data'
-        output = open(data_path, 'wb')
-        output.write(self.data)
-
-        layers_decl_data_path = path + 'data.txt'
-        output = open(layers_decl_data_path, 'a')
-        for layer in self.layers:
-            output.write(f'{ut.b2s_name(layer[0])}\n')
-            output.write(f'{ut.b2s_name(layer[1])}\n')
+    def get_unswizzled_vram_data(self):
+        data = self.vram_data
+        if self.get_texture_type() == '27':
+            data = bytearray()
+            for i in range(0, len(self.vram_data), 4):
+                elt = self.vram_data[i:i+4]
+                # Swap bytes
+                data.extend(struct.pack("<I", struct.unpack(">I", elt)[0]))
+        return data
+    
+    def get_output_format(self):
+        texture_type = self.get_texture_type()
+        if (texture_type == 'DXT1') or (texture_type == 'DXT5'):
+            return 'DDS'
+        elif (texture_type == '27'):
+            return 'BMP'
+        return 'unknown'
 
     def __repr__(self):
         return (
             f'\nclass: {self.__class__.__name__}\n'
             f'name: {self.name}\n'
+            f'vram_data_size: {self.vram_data_size}\n'
+            f'resolution: {self.width}x{self.height}\n'
+            f'mipmap_count: {self.mipmap_count}\n'
+            f'texture_type: {hex(self.texture_type)}\n'
         )
