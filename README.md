@@ -40,4 +40,4 @@ pyinstaller app.spec
 
 ## Usage
 
-Check out the video [here]()
+Check out the tutorial [here](https://www.youtube.com/watch?v=HiU3i0ZZn2I&list=PL1zfdnvxzp12kg2b_ubdOqmoTyLLE3gcY)
