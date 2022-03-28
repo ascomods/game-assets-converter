@@ -122,7 +122,7 @@ class MainHandler():
             self.other_files[filename] = path
         self.view_handler.set_entries('file_list_model', self.other_files.keys())
     
-    def import_action(self, observed = None, args = None):
+    def import_action(self, observed = None, args = []):
         if self.view_handler.window_handler.__class__.__name__ != 'MainWindowHandler':
             self.close_action()
 
@@ -179,6 +179,7 @@ class MainHandler():
             if spr_path:
                 self.data['spr_stpk'] = self.get_stpk_file(spr_path)
                 if self.data['spr_stpk'] == None:
+                    del self.data['spr_stpk']
                     stream = open(spr_path, "rb")
                     data_tag = stream.read(4)
                     stream.seek(0)
@@ -250,4 +251,7 @@ class MainHandler():
             else:
                 raise Exception("No texture info found in SPR !")
         except Exception as e:
+            print(e)
+            import traceback
+            traceback.print_exc()
             self.view_handler.show_message_dialog("Error while loading files", 'critical')

@@ -57,7 +57,8 @@ class TX2D:
     def get_texture_type(self):
         if hex(self.texture_type) == '0x8000000':
             return 'DXT1'
-        elif (hex(self.texture_type) == '0x18000000') or (hex(self.texture_type) == '0x20000000'):
+        elif (hex(self.texture_type) == '0x18000000') or \
+             (hex(self.texture_type) == '0x20000000'):
             return 'DXT5'
         elif self.texture_type == 0: # r8g8b8a8_typeless
             return '27'

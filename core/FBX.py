@@ -388,15 +388,16 @@ class FBX:
                         data['bone_weights'][-1]['data'].append({vertex_indices[j]: weights[j]})
         except Exception as e:
             print(e)
+            print(node.GetName())
 
         for i in range(node.GetMaterialCount()):
             material = node.GetMaterial(i)
             prop = material.FindProperty(fbx.FbxSurfaceMaterial.sDiffuse)
             layered_texture = prop.GetSrcObject(fbx.FbxCriteria.ObjectType(fbx.FbxLayeredTexture.ClassId), 0)
             if layered_texture:
-                textureCount = \
+                texture_count = \
                     layered_texture.GetSrcObjectCount(fbx.FbxCriteria.ObjectType(fbx.FbxTexture.ClassId))
-            for i in range(textureCount):
+            for i in range(texture_count):
                 texture = layered_texture.GetSrcObject(fbx.FbxCriteria.ObjectType(fbx.FbxTexture.ClassId), i)
                 data['materials'].append((texture.GetName(), texture.GetFileName()))
 
@@ -529,7 +530,7 @@ class FBX:
             print(e)
 
         # Materials
-        material_name = name.split(':')[1]
+        material_name = name.rsplit(':', 1)[1]
         for material in self.data['material']:
             if ut.b2s_name(material.name) == material_name:
                 material.data.sort()

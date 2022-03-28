@@ -215,183 +215,188 @@ class ImportTask(Task):
                 layered_mesh_name = mesh_name
                 layer_name, mesh_name = self.format_name(mesh_name, '', '')
                 mesh_name = ut.s2b_name(mesh_name)
-                if layer_name != '':
-                    scene_layers[mesh_name] = ut.s2b_name(layer_name)
-
-                vbuf_object = VBUF('', '', spr_object.string_table)
-
-                # Adjusting weights and indices data from FBX to RB format
-                weights = data['bone_weights']
-                indices = data['bone_indices']
-                
-                all_weights = {}
-                all_indices = {}
-                for i in range(len(indices)):
-                    for j in range(len(indices[i]['data'])):
-                        key = list(indices[i]['data'][j].keys())[0]
-                        if key not in all_indices:
-                            all_indices[key] = [indices[i]['data'][j][key]]
-                            all_weights[key] = [weights[i]['data'][j][key]]
-                        else:
-                            all_indices[key].append(indices[i]['data'][j][key])
-                            all_weights[key].append(weights[i]['data'][j][key])
-
-                data_lists_count = 0
-                for i in range(len(data['positions'][0]['data'])):
-                    if i not in all_indices.keys():
-                        all_indices[i] = [0]
-                        all_weights[i] = [0.0]
-                    elif data_lists_count < len(all_indices[i]):
-                        data_lists_count = len(all_indices[i])
-
-                # Adjusting lists to the same size
-                for i in range(len(data['positions'][0]['data'])):
-                    if len(all_indices[i]) < data_lists_count:
-                        for j in range(len(all_indices[i]), data_lists_count):
-                            all_indices[i].append(0)
-                            all_weights[i].append(0.0)
-                
-                data['bone_weights'] = []
-                data['bone_indices'] = []
-                
-                for i in range(data_lists_count):
-                    data['bone_indices'].append({'data': []})
-                    data['bone_weights'].append({'data': []})
-                
-                for i in range(len(all_indices)):
-                    for j in range(len(all_indices[i])):
-                        data['bone_indices'][j]['data'].append((all_indices[i][j],))
-                        data['bone_weights'][j]['data'].append((all_weights[i][j],))
-
-                # Handle data from FBX
-                for vtx_usage, vtx_data_entries in data.items():
-                    if vtx_usage in VBUF.vertex_usage_mapping.values():
-                        index = 0
-                        vbuf_object.data[vtx_usage] = []
-                        
-                        for vtx_data in vtx_data_entries:
-                            decl_data = {}
-                            decl_data['unknown0x00'] = '0'
-                            try:
-                                decl_data['resource_name'] = ut.s2b_name(vtx_data['resource_name'])
-                                string_list.append(decl_data['resource_name'])
-                            except:
-                                decl_data['resource_name'] = ''
-                            vertex_usage_num = ut.search_index_dict(VBUF.vertex_usage_mapping, vtx_usage)
-                            decl_data['vertex_usage'] = VBUF.vertex_usage[vertex_usage_num]
-                            format_num = VBUF.vertex_format_mapping[vtx_usage]
-                            decl_data['index'] = index
-                            format = VBUF.vertex_format[format_num]
-                            decl_data['vertex_format'] = format
-                            decl_data['data'] = vtx_data['data']
-                            
-                            # Adjusting vertices positions and normals to RB format
-                            if vtx_usage == 'positions':
-                                for i in range(len(decl_data['data'])):
-                                    vtx = decl_data['data'][i]
-                                    decl_data['data'][i] = (vtx[0], vtx[1], vtx[2], 1.0)
-                            elif vtx_usage == 'normals':
-                                for i in range(len(decl_data['data'])):
-                                    vtx = decl_data['data'][i]
-                                    decl_data['data'][i] = (vtx[0], vtx[1], vtx[2], 0.0)
-                            elif vtx_usage == 'binormals':
-                                for i in range(len(decl_data['data'])):
-                                    vtx = decl_data['data'][i]
-                                    decl_data['data'][i] = (vtx[0], vtx[1], vtx[2], 0.0)
-
-                            vbuf_object.data[vtx_usage].append(decl_data)
-                            index += 1
-                try:
-                    material_name = mesh_name.split(b':')[1]
-                except:
-                    material_name = mesh_name + b'_mat'
-                string_list.append(material_name)
 
                 try:
-                    mtrl_data = mtrl_dict[ut.b2s_name(material_name)]
-                except:
-                    mtrl_data = None
+                    if layer_name != '':
+                        scene_layers[mesh_name] = ut.s2b_name(layer_name)
 
-                # Materials
-                if material_name not in materials.keys():
-                    mtrl_object = MTRL('', material_name, spr_object.string_table)
-                    if mtrl_data != None:
-                        mtrl_object.load_data(mtrl_data)
-                    for layer in data['materials']:
-                        # Textures                   
-                        layer_name, source_name, texture_names, spr_data_entry = \
-                            self.add_texture(spr_object, texture_names, layer[0], layer[1])
-                        if spr_data_entry != None:
-                            spr['TX2D'].entries.append(spr_data_entry)
-                        string_list.append(layer_name)
-                        string_list.append(source_name)
-                        mtrl_object.layers.append((layer_name, source_name))
-                    mtrl_object.sort(True)
+                    vbuf_object = VBUF('', '', spr_object.string_table)
+
+                    # Adjusting weights and indices data from FBX to RB format
+                    weights = data['bone_weights']
+                    indices = data['bone_indices']
                     
-                    spr_data_entry = SPRPDataEntry(b'MTRL', material_name, spr_object.string_table, True)
-                    spr_data_entry.data = mtrl_object
+                    all_weights = {}
+                    all_indices = {}
+                    for i in range(len(indices)):
+                        for j in range(len(indices[i]['data'])):
+                            key = list(indices[i]['data'][j].keys())[0]
+                            if key not in all_indices:
+                                all_indices[key] = [indices[i]['data'][j][key]]
+                                all_weights[key] = [weights[i]['data'][j][key]]
+                            else:
+                                all_indices[key].append(indices[i]['data'][j][key])
+                                all_weights[key].append(weights[i]['data'][j][key])
 
-                    string_list.append(b'DbzCharMtrl')
-                    mtrl_prop_object = MTRL_PROP('', b'DbzCharMtrl', spr_object.string_table)
-                    if mtrl_data != None:
-                        if 'DbzCharMtrl' in mtrl_data.keys():
-                            mtrl_prop_object.load_data(mtrl_data['DbzCharMtrl'])
-                    spr_child_data_entry = SPRPDataEntry(b'MTRL', b'DbzCharMtrl', spr_object.string_table)
-                    spr_child_data_entry.data = mtrl_prop_object
-                    spr_data_entry.children.append(spr_child_data_entry)
+                    data_lists_count = 0
+                    for i in range(len(data['positions'][0]['data'])):
+                        if i not in all_indices.keys():
+                            all_indices[i] = [0]
+                            all_weights[i] = [0.0]
+                        elif data_lists_count < len(all_indices[i]):
+                            data_lists_count = len(all_indices[i])
 
-                    spr['MTRL'].entries.append(spr_data_entry)
-                    materials[material_name] = spr_data_entry
+                    # Adjusting lists to the same size
+                    for i in range(len(data['positions'][0]['data'])):
+                        if len(all_indices[i]) < data_lists_count:
+                            for j in range(len(all_indices[i]), data_lists_count):
+                                all_indices[i].append(0)
+                                all_weights[i].append(0.0)
+                    
+                    data['bone_weights'] = []
+                    data['bone_indices'] = []
+                    
+                    for i in range(data_lists_count):
+                        data['bone_indices'].append({'data': []})
+                        data['bone_weights'].append({'data': []})
+                    
+                    for i in range(len(all_indices)):
+                        for j in range(len(all_indices[i])):
+                            data['bone_indices'][j]['data'].append((all_indices[i][j],))
+                            data['bone_weights'][j]['data'].append((all_weights[i][j],))
 
-                # Shapes
-                try:
-                    shape_name = mesh_name.split(b':')[0]
-                except:
-                    shape_name = mesh_name
-                shap_name = shape_name + b'Shape'
-                string_list.append(shap_name)
+                    # Handle data from FBX
+                    for vtx_usage, vtx_data_entries in data.items():
+                        if vtx_usage in VBUF.vertex_usage_mapping.values():
+                            index = 0
+                            vbuf_object.data[vtx_usage] = []
+                            
+                            for vtx_data in vtx_data_entries:
+                                decl_data = {}
+                                decl_data['unknown0x00'] = '0'
+                                try:
+                                    decl_data['resource_name'] = ut.s2b_name(vtx_data['resource_name'])
+                                    string_list.append(decl_data['resource_name'])
+                                except:
+                                    decl_data['resource_name'] = ''
+                                vertex_usage_num = ut.search_index_dict(VBUF.vertex_usage_mapping, vtx_usage)
+                                decl_data['vertex_usage'] = VBUF.vertex_usage[vertex_usage_num]
+                                format_num = VBUF.vertex_format_mapping[vtx_usage]
+                                decl_data['index'] = index
+                                format = VBUF.vertex_format[format_num]
+                                decl_data['vertex_format'] = format
+                                decl_data['data'] = vtx_data['data']
+                                
+                                # Adjusting vertices positions and normals to RB format
+                                if vtx_usage == 'positions':
+                                    for i in range(len(decl_data['data'])):
+                                        vtx = decl_data['data'][i]
+                                        decl_data['data'][i] = (vtx[0], vtx[1], vtx[2], 1.0)
+                                elif vtx_usage == 'normals':
+                                    for i in range(len(decl_data['data'])):
+                                        vtx = decl_data['data'][i]
+                                        decl_data['data'][i] = (vtx[0], vtx[1], vtx[2], 0.0)
+                                elif vtx_usage == 'binormals':
+                                    for i in range(len(decl_data['data'])):
+                                        vtx = decl_data['data'][i]
+                                        decl_data['data'][i] = (vtx[0], vtx[1], vtx[2], 0.0)
 
-                try:
-                    shap_data = shap_dict[ut.b2s_name(shap_name)]
-                except:
-                    shap_data = None
+                                vbuf_object.data[vtx_usage].append(decl_data)
+                                index += 1
+                    try:
+                        material_name = mesh_name.rsplit(b':', 1)[1]
+                    except:
+                        material_name = mesh_name + b'_mat'
+                    string_list.append(material_name)
 
-                if shape_name not in shapes.keys():
-                    shape_object = SHAP('', b'', spr_object.string_table)
-                    if shap_data:
-                        shape_object.load_data(shap_data)
-                    spr_data_entry = SPRPDataEntry(b'SHAP', shap_name, spr_object.string_table, True)
-                    spr_data_entry.data = shape_object
+                    try:
+                        mtrl_data = mtrl_dict[ut.b2s_name(material_name)]
+                    except:
+                        mtrl_data = None
+                    
+                    # Materials
+                    if material_name not in materials.keys():
+                        mtrl_object = MTRL('', material_name, spr_object.string_table)
+                        if mtrl_data != None:
+                            mtrl_object.load_data(mtrl_data)
+                        for layer in data['materials']:
+                            # Textures                   
+                            layer_name, source_name, texture_names, spr_data_entry = \
+                                self.add_texture(spr_object, texture_names, layer[0], layer[1])
+                            if spr_data_entry != None:
+                                spr['TX2D'].entries.append(spr_data_entry)
+                            string_list.append(layer_name)
+                            string_list.append(source_name)
+                            mtrl_object.layers.append((layer_name, source_name))
+                        mtrl_object.sort(True)
+                        
+                        spr_data_entry = SPRPDataEntry(b'MTRL', material_name, spr_object.string_table, True)
+                        spr_data_entry.data = mtrl_object
 
-                    string_list.append(b'DbzEdgeInfo')
-                    shape_object = SHAP('', b'DbzEdgeInfo', spr_object.string_table)
-                    if shap_data and 'DbzEdgeInfo' in shap_data.keys():
-                        shape_object.load_data(shap_data['DbzEdgeInfo'])
-                        if shape_object.source_name != b'':
-                            string_list.append(shape_object.source_name)
-                            # Add source texture if its missing
-                            if shape_object.source_name not in texture_names:
-                                texture_name = ut.b2s_name(shape_object.source_name)
-                                texture_path = glob.glob(f"{os.path.dirname(self.input_path)}/*{texture_name}")[0]
-                                layer_name, source_name, texture_names, texture_spr_data_entry = \
-                                    self.add_texture(spr_object, texture_names, '', texture_path)
-                                if texture_spr_data_entry != None:
-                                    spr['TX2D'].entries.append(texture_spr_data_entry)
-                        if shape_object.source_type != b'':
-                            string_list.append(shape_object.source_type)
+                        string_list.append(b'DbzCharMtrl')
+                        mtrl_prop_object = MTRL_PROP('', b'DbzCharMtrl', spr_object.string_table)
+                        if mtrl_data != None:
+                            if 'DbzCharMtrl' in mtrl_data.keys():
+                                mtrl_prop_object.load_data(mtrl_data['DbzCharMtrl'])
+                        spr_child_data_entry = SPRPDataEntry(b'MTRL', b'DbzCharMtrl', spr_object.string_table)
+                        spr_child_data_entry.data = mtrl_prop_object
+                        spr_data_entry.children.append(spr_child_data_entry)
 
-                    spr_child_data_entry = SPRPDataEntry(b'SHAP', b'DbzEdgeInfo', spr_object.string_table)
-                    spr_child_data_entry.data = shape_object
-                    spr_data_entry.children.append(spr_child_data_entry)
+                        spr['MTRL'].entries.append(spr_data_entry)
+                        materials[material_name] = spr_data_entry
 
-                    string_list.append(b'DbzShapeInfo')
-                    shape_object = SHAP('', b'DbzShapeInfo', spr_object.string_table)
-                    spr_child_data_entry = SPRPDataEntry(b'SHAP', b'DbzShapeInfo', spr_object.string_table)
-                    spr_child_data_entry.data = shape_object
-                    spr_data_entry.children.append(spr_child_data_entry)
+                    # Shapes
+                    try:
+                        shape_name = mesh_name.split(b':')[0]
+                    except:
+                        shape_name = mesh_name
+                    shap_name = shape_name + b'Shape'
+                    string_list.append(shap_name)
 
-                    spr['SHAP'].entries.append(spr_data_entry)
-                    shapes[shape_name] = spr_data_entry
+                    try:
+                        shap_data = shap_dict[ut.b2s_name(shap_name)]
+                    except:
+                        shap_data = None
+
+                    if shape_name not in shapes.keys():
+                        shape_object = SHAP('', b'', spr_object.string_table)
+                        if shap_data:
+                            shape_object.load_data(shap_data)
+                        spr_data_entry = SPRPDataEntry(b'SHAP', shap_name, spr_object.string_table, True)
+                        spr_data_entry.data = shape_object
+
+                        string_list.append(b'DbzEdgeInfo')
+                        shape_object = SHAP('', b'DbzEdgeInfo', spr_object.string_table)
+                        if shap_data and 'DbzEdgeInfo' in shap_data.keys():
+                            shape_object.load_data(shap_data['DbzEdgeInfo'])
+                            if shape_object.source_name != b'':
+                                string_list.append(shape_object.source_name)
+                                # Add source texture if its missing
+                                if shape_object.source_name not in texture_names:
+                                    texture_name = ut.b2s_name(shape_object.source_name)
+                                    texture_path = glob.glob(f"{os.path.dirname(self.input_path)}/*{texture_name}")[0]
+                                    layer_name, source_name, texture_names, texture_spr_data_entry = \
+                                        self.add_texture(spr_object, texture_names, '', texture_path)
+                                    if texture_spr_data_entry != None:
+                                        spr['TX2D'].entries.append(texture_spr_data_entry)
+                            if shape_object.source_type != b'':
+                                string_list.append(shape_object.source_type)
+
+                        spr_child_data_entry = SPRPDataEntry(b'SHAP', b'DbzEdgeInfo', spr_object.string_table)
+                        spr_child_data_entry.data = shape_object
+                        spr_data_entry.children.append(spr_child_data_entry)
+
+                        string_list.append(b'DbzShapeInfo')
+                        shape_object = SHAP('', b'DbzShapeInfo', spr_object.string_table)
+                        spr_child_data_entry = SPRPDataEntry(b'SHAP', b'DbzShapeInfo', spr_object.string_table)
+                        spr_child_data_entry.data = shape_object
+                        spr_data_entry.children.append(spr_child_data_entry)
+
+                        spr['SHAP'].entries.append(spr_data_entry)
+                        shapes[shape_name] = spr_data_entry
+                except Exception as e:
+                    print(mesh_name)
+                    print(e)
                 
                 vbuf_object.load_data()
                 if b'EYE' in mesh_name:
@@ -580,7 +585,21 @@ class ImportTask(Task):
                 data = tx2d_object.get_vram()
                 padding = ut.add_padding(len(data))
                 vram_data.extend(data)
-                vram_data.extend(bytes(padding - len(data)))
+                padding_lenght = padding - len(data)
+
+                if tx2d_object.get_texture_type() == 'DXT1':
+                    if tx2d_object.width == tx2d_object.height:
+                        padding_lenght += 80
+                    else:
+                        padding_lenght += 32
+                elif tx2d_object.get_texture_type() == 'DXT5':
+                    if tx2d_object.width == tx2d_object.height:
+                        padding_lenght += 48
+                    else:
+                        padding_lenght += 80
+
+                vram_data.extend(bytes(padding_lenght))
+
             self.data['vram'] = vram_data
             spr_object.vram_data_size = len(vram_data)
 
@@ -591,7 +610,12 @@ class ImportTask(Task):
 
             self.send_progress(80)
 
-            self.save_action()
+            if (self.data['spr'] != None) and (self.data['ioram'] != None) and (self.data['vram'] != None):
+                self.save_file('spr', self.spr_path, self.other_files)
+                self.save_file('ioram', self.ioram_path, [], True)
+                self.save_file('vram', self.vram_path, [], True)
+            else:
+                raise Exception("Files couldn't be saved properly !")
 
             self.send_progress(100)
             self.result_signal.emit(self.__class__.__name__)
@@ -601,7 +625,7 @@ class ImportTask(Task):
             import traceback
             traceback.print_exc()
 
-    def save_file(self, key, path, other_files = []):
+    def save_file(self, key, path, other_files = [], add_extra_bytes = False):
         name, ext = os.path.splitext(os.path.basename(path))
         if ext[-3:] == 'pak':
             stpk_key = f"{key}_stpk"
@@ -617,7 +641,7 @@ class ImportTask(Task):
         
             stpk_path = f"{cm.temp_path}/{name}.pak"
             stream = open(f"{cm.temp_path}/{name}.pak", 'wb')
-            self.data[stpk_key].write(stream)
+            self.data[stpk_key].write(stream, add_extra_bytes)
             stream.close()
 
             if ext == '.zpak':
@@ -632,48 +656,6 @@ class ImportTask(Task):
             except Exception:
                 stream.write(self.data[key])
             stream.close()
-
-    def save_action(self):
-        if (self.data['spr'] != None) and (self.data['ioram'] != None) and (self.data['vram'] != None):               
-            res = self.data['spr'].search_entries([], 'TX2D')
-            if len(res) > 0:
-                # Build new vram data
-                vram_data = bytearray()
-
-                for entry in res:
-                    tx2d = entry.data
-                    tx2d.vram_data_offset = len(vram_data)
-                    data = tx2d.get_vram()
-                    padding = ut.add_padding(len(data))
-                    vram_data.extend(data)
-                    vram_data.extend(bytes(padding - len(data)))
-                
-                self.data['vram'] = vram_data
-            else:
-                raise Exception("No texture info found in SPR !")
-
-            res = self.data['spr'].search_entries([], 'VBUF')
-            if len(res) > 0:
-                # Build new ioram data
-                ioram_data = bytearray()
-
-                for entry in res:
-                    vbuf = entry.data
-                    vbuf.ioram_data_offset = len(ioram_data)
-                    data = vbuf.get_ioram()
-                    padding = ut.add_padding(len(data))
-                    ioram_data.extend(data)
-                    ioram_data.extend(bytes(padding - len(data)))
-                
-                self.data['ioram'] = ioram_data
-            else:
-                raise Exception("No model info found in SPR !")
-
-            self.save_file('spr', self.spr_path, self.other_files)
-            self.save_file('ioram', self.ioram_path)
-            self.save_file('vram', self.vram_path)
-        else:
-            raise Exception("Files are not loaded properly !")
 
     def format_name(self, name, full_name = '', sep = '|'):
         layer_name = re.findall(r'^\[(.*?)\]', name)

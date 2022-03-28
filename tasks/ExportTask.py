@@ -97,6 +97,10 @@ class ExportTask(Task):
                     if 'children' in content.keys():
                         content['DbzCharMtrl'] = content['children'][0]
                         del content['children']
+                    try:
+                        data.name = data.name.rsplit(b':', 1)[1]
+                    except:
+                        pass
                     mtrl_dict[ut.b2s_name(data.name)] = content
 
             json_data = json.dumps(mtrl_dict, indent=4)
@@ -119,7 +123,8 @@ class ExportTask(Task):
                         eye_texture_names.append(entry.name.replace(b'.tga', b'.dds'))
                 
                 for i in range(len(txan_data.entries)):
-                    txan_data.entries[i].name = eye_texture_names[i]
+                    idx = i % len(eye_texture_names)
+                    txan_data.entries[i].name = eye_texture_names[idx]
 
                 json_data = json.dumps(txan_data.get_data(), indent=4)
                 data_stream = open(f"{self.output_path}\TXAN.json", "w")

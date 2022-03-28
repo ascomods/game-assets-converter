@@ -39,7 +39,8 @@ class STPK:
                 entry_object = eval(data_tag)(data_name, data_size)
             except Exception as e:
                 try:
-                    data_tag = data_name.decode('utf-8').split('.')[1].upper()
+                    data_tag = data_name.rsplit(b'.', 1)[1].upper()
+                    data_tag = self.ext_to_class[data_tag]
                     entry_object = eval(data_tag)(data_name, data_size)
                 except Exception:
                     data_tag = 'STPKEntry'
@@ -48,7 +49,7 @@ class STPK:
 
             self.entries.append(entry_object)
 
-    def write(self, stream):
+    def write(self, stream, add_extra_bytes = False):
         # Writing header
         stream.write(ut.s2b_name(self.__class__.__name__))
         stream.write(ut.i2b(1)) # write unknown bytes
@@ -56,6 +57,8 @@ class STPK:
         stream.write(ut.i2b(self.start_offset)) # write start offset
 
         stream.write(bytes(self.entry_size * len(self.entries)))
+        if add_extra_bytes:
+            stream.write(bytes(64)) # Extra bytes for console support
         self.write_data(stream)
 
         # Writing entries info
