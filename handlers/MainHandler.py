@@ -1,6 +1,7 @@
 import os
 from io import BytesIO
 from PyQt5.QtCore import QThread
+from natsort import natsorted
 from core.STPZ import *
 from core.STPK import *
 from tasks.ImportTask import *
@@ -103,7 +104,7 @@ class MainHandler():
                     f"Other files to include in SPR {ext} file")
                 
                 self.other_files = {}
-                for path in glob.glob(f"{fbx_dir_path}\\pak_files\\*"):
+                for path in natsorted(glob.glob(f"{fbx_dir_path}\\pak_files\\*")):
                     filename = os.path.basename(path)
                     filename = re.sub('^\[\d+\]', '', filename)
                     self.other_files[filename] = path
@@ -197,7 +198,7 @@ class MainHandler():
                     if cm.selected_game == 'dbrb':
                         # RB1 nested STPK
                         self.data['spr_stpk'] = self.data['spr_stpk'].entries[0]
-                    self.data['spr'] = self.data['spr_stpk'].search_entries('.spr')[0]
+                    self.data['spr'] = self.data['spr_stpk'].search_entries([], '.spr')[0]
             else:
                 return
             
@@ -213,7 +214,7 @@ class MainHandler():
                     if cm.selected_game == 'dbrb':
                         # RB1 nested STPK
                         self.data['ioram_stpk'] = self.data['ioram_stpk'].entries[0]
-                    self.data['ioram'] = self.data['ioram_stpk'].search_entries('.ioram')[0].data
+                    self.data['ioram'] = self.data['ioram_stpk'].search_entries([], '.ioram')[0].data
             else:
                 return
             
@@ -238,7 +239,7 @@ class MainHandler():
                     if cm.selected_game == 'dbrb':
                         # RB1 nested STPK
                         self.data['vram_stpk'] = self.data['vram_stpk'].entries[0]
-                    self.data['vram'] = self.data['vram_stpk'].search_entries('.vram')[0].data
+                    self.data['vram'] = self.data['vram_stpk'].search_entries([], '.vram')[0].data
             else:
                 return
 

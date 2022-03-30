@@ -7,6 +7,7 @@ class_map = {
 }
 
 games = {
+    'dbrb': 'DragonBall Raging Blast',
     'dbrb2': 'DragonBall Raging Blast 2'
 }
 

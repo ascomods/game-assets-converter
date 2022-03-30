@@ -3,34 +3,40 @@ import core.utils as ut
 from .SPRP import SPRP
 
 class STPK:
+    header_size = 16
     entry_size = 48
-    start_offset = ut.b2i(b'\x10')
     ext_to_class = {b'SPR': b'SPRP'}
 
-    def __init__(self, name = '', size = ''):
+    def __init__(self, name = '', size = 0, add_extra_bytes = False):
         self.entries = []
         self.name = name
         self.size = size
-    
-    def get_header_size(self):
-        return self.start_offset + (self.entry_size * len(self.entries))
+        self.add_extra_bytes = add_extra_bytes
+
+    def get_size(self):
+        size = self.header_size + len(self.entries) * self.entry_size
+        for entry in self.entries:
+            size += entry.get_size()
+        return size
 
     def read(self, stream, data_offset = 0):
-        stream.seek(8, os.SEEK_CUR) # skip data tag + unknown bytes
+        self.start_offset = stream.tell()
+        stream.seek(8, os.SEEK_CUR) # skip unknown bytes
         entry_count = ut.b2i(stream.read(4))
         stream.seek(4, os.SEEK_CUR) # skip unknown bytes
-        self.start_offset += data_offset
-        
+        self.entries_offset = self.start_offset + self.header_size
+
         for i in range(entry_count):
-            stream.seek(self.start_offset + (i * self.entry_size))
+            stream.seek(self.entries_offset + (i * self.entry_size))
             data_offset = ut.b2i(stream.read(4))
             data_size = ut.b2i(stream.read(4))
             stream.seek(8, os.SEEK_CUR) # skip unknown bytes
             data_name = ut.read_string(stream, 32, 32)
             
             # start reading entry's header
-            stream.seek(data_offset)
+            stream.seek(self.start_offset + data_offset)
             data_tag = stream.read(4)
+            stream.seek(-4, os.SEEK_CUR)
 
             # try to use the data_tag to guess the class
             # use extension otherwise and if it is still not identified
@@ -45,26 +51,27 @@ class STPK:
                 except Exception:
                     data_tag = 'STPKEntry'
                     entry_object = eval(data_tag)(data_name, data_size)
-            entry_object.read(stream, data_offset)
+            entry_object.read(stream, self.start_offset + data_offset)
 
             self.entries.append(entry_object)
 
-    def write(self, stream, add_extra_bytes = False):
+    def write(self, stream):
         # Writing header
+        self.start_offset = stream.tell()
         stream.write(ut.s2b_name(self.__class__.__name__))
         stream.write(ut.i2b(1)) # write unknown bytes
         stream.write(ut.i2b(len(self.entries)))
-        stream.write(ut.i2b(self.start_offset)) # write start offset
+        stream.write(ut.i2b(self.header_size))
 
         stream.write(bytes(self.entry_size * len(self.entries)))
-        if add_extra_bytes:
+        if self.add_extra_bytes:
             stream.write(bytes(64)) # Extra bytes for console support
         self.write_data(stream)
 
         # Writing entries info
-        stream.seek(self.start_offset)
+        stream.seek(self.start_offset + self.header_size)
         for entry in self.entries:
-            stream.write(ut.i2b(entry.offset))
+            stream.write(ut.i2b(entry.offset - self.start_offset))
             size = entry.get_size()
             stream.write(ut.extb(ut.i2b(size), 12))
             stream.write(ut.extb(entry.name, 32))
@@ -86,9 +93,7 @@ class STPK:
         entry_object.data = entry_data
         self.entries.append(entry_object)
 
-    def search_entries(self, criteria):
-        entry_list = []
-
+    def search_entries(self, entry_list = [], criteria = ''):
         for entry in self.entries:
             if (entry.__class__.__name__ == criteria) or \
                (criteria in ut.b2s_name(entry.name)):

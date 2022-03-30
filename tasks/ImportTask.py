@@ -6,7 +6,6 @@ import glob
 import numpy as np
 from natsort import natsorted
 from copy import deepcopy
-from PyQt5.QtCore import QObject, pyqtSignal
 from tasks.Task import Task
 from core.STPZ import *
 from core.STPK import *
@@ -629,7 +628,7 @@ class ImportTask(Task):
         name, ext = os.path.splitext(os.path.basename(path))
         if ext[-3:] == 'pak':
             stpk_key = f"{key}_stpk"
-            self.data[stpk_key] = STPK(f"{name}.pak")
+            self.data[stpk_key] = STPK(f"{name}.pak", 0, add_extra_bytes)
 
             self.data[stpk_key].add_entry(f"{name}.{key}", self.data[key])
             for other_file_path in other_files:
@@ -638,10 +637,15 @@ class ImportTask(Task):
                 stream = open(other_file_path, 'rb')
                 self.data[stpk_key].add_entry(filename, stream.read())
                 stream.close()
-        
+
+            if cm.selected_game == 'dbrb':
+                operate_stpk = STPK(f"{name}.pak", 0, add_extra_bytes)
+                operate_stpk.add_entry(f"op_{name}.pak", self.data[stpk_key])
+                self.data[stpk_key] = operate_stpk
+            
             stpk_path = f"{cm.temp_path}/{name}.pak"
             stream = open(f"{cm.temp_path}/{name}.pak", 'wb')
-            self.data[stpk_key].write(stream, add_extra_bytes)
+            self.data[stpk_key].write(stream)
             stream.close()
 
             if ext == '.zpak':
