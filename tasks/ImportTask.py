@@ -86,10 +86,10 @@ class ImportTask(Task):
 
             try:
                 stream = open(f"{os.path.dirname(self.input_path)}\BONE.json", "r")
-                bone_info_dict = json.load(stream)
+                loaded_bone_dict = json.load(stream)
                 stream.close()
             except:
-                bone_info_dict = {}
+                loaded_bone_dict = {}
 
             try:
                 stream = open(f"{os.path.dirname(self.input_path)}\DRVN.json", "r")
@@ -142,6 +142,14 @@ class ImportTask(Task):
                     tuple(lt.GetRow(3))
                 ]).transpose()
 
+                try:
+                    bone_entry_object.transform1 = \
+                        np.array(loaded_bone_dict[node.GetName()]['data']['transform1'])
+                    bone_entry_object.transform2 = \
+                        np.array(loaded_bone_dict[node.GetName()]['data']['transform2'])
+                except:
+                    pass
+
                 bone_object.bone_entries.append(bone_entry_object)
                 bone_dict[bone_entry_object.name] = bone_entry_object
 
@@ -182,10 +190,21 @@ class ImportTask(Task):
             string_list.append(b'DbzBoneInfo')
             bone_info_object = BONE_INFO()
 
+            try:
+                first_bone_dict = list(loaded_bone_dict.values())[0]
+                bone_char_info_name = list(first_bone_dict.keys())[2]
+                string_list.append(ut.s2b_name(bone_char_info_name))
+                bone_char_info_object = BONE_INFO()
+                bone_char_info_object.info_size = 20
+            except Exception as e:
+                pass
+
             new_bone_info_dict = {}
+            new_bone_char_info_dict = {}
             for bone in bone_object.bone_entries:
                 try:
-                    new_bone_info_dict[ut.b2s_name(bone.name)] = bone_info_dict[ut.b2s_name(bone.name)]
+                    new_bone_info_dict[ut.b2s_name(bone.name)] = \
+                        loaded_bone_dict[ut.b2s_name(bone.name)]['DbzBoneInfo']
                 except:
                     new_bone_info_dict[ut.b2s_name(bone.name)] = {
                         'unknown0x00': "\u0000\u0000\u0000\u0000",
@@ -193,12 +212,24 @@ class ImportTask(Task):
                                   0.0, 0.0, 0.0,
                                   0.0, 0.0, 0.0 ]
                     }
-            
+                try:
+                    new_bone_char_info_dict[ut.b2s_name(bone.name)] = \
+                        loaded_bone_dict[ut.b2s_name(bone.name)][bone_char_info_name]
+                except:
+                    pass
+
             bone_info_object.load_data(new_bone_info_dict)
             spr_child_data_entry = SPRPDataEntry(b'BONE', b'DbzBoneInfo', spr_object.string_table)
             spr_child_data_entry.data = bone_info_object
-
             spr_data_entry.children.append(spr_child_data_entry)
+
+            if new_bone_char_info_dict != {}:
+                bone_char_info_object.load_data(new_bone_char_info_dict)
+                spr_child_data_entry = SPRPDataEntry(b'BONE', 
+                    ut.s2b_name(bone_char_info_name), spr_object.string_table)
+                spr_child_data_entry.data = bone_char_info_object
+                spr_data_entry.children.append(spr_child_data_entry)
+
             spr['BONE'].entries.append(spr_data_entry)
 
             self.send_progress(30)

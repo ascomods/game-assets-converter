@@ -316,10 +316,13 @@ class SPRPDataEntry:
             elif self.type == b'SHAP':
                 data_object = SHAP('', self.name, self.string_table)
             elif self.type == b'BONE':
-                if self.name == b'DbzBoneInfo':
+                if self.name == b'NULL':
+                    data_object = BONE('', self.name)
+                elif self.name == b'DbzBoneInfo':
                     data_object = BONE_INFO('', b'', self.size)
                 else:
-                    data_object = BONE('', self.name)
+                    data_object = BONE_INFO('', self.name, self.size)
+                    data_object.info_size = 20
             else:
                 data_object = eval(self.type)('', b'', self.string_table)
             data_object.read(stream, self.data_offset)
@@ -337,8 +340,8 @@ class SPRPDataEntry:
                 
                 try:
                     child_class = ut.b2s_name(self.type)
-                    if child_class != 'SCNE':
-                        if name not in [b'DbzBoneInfo', b'DbzCharMtrl', b'DbzEdgeInfo', b'DbzShapeInfo']:
+                    if child_class not in ['BONE', 'SCNE']:
+                        if name not in [b'DbzCharMtrl', b'DbzEdgeInfo', b'DbzShapeInfo']:
                             child_object = eval(child_class)(self.type, name, self.string_table)
                         else:
                             raise Exception()

@@ -175,6 +175,24 @@ class BONE:
 
         return last_data_pos
 
+    def load_data(self, content):
+        bytes_data = bytearray()
+        for elt in content.values():
+            bytes_data.extend(elt['unknown0x00'].encode('latin-1'))
+            bytes_data.extend(np.array(elt['data'], dtype='>f').tobytes())
+        self.data = bytes_data
+        self.data_size = len(self.data)
+
+    def get_data(self):
+        data = []
+        for entry in self.bone_entries:
+            data.append({
+                'transform1': entry.transform1.tolist(),
+                'transform2': entry.transform2.tolist()
+            })
+        
+        return data
+
 class BONE_DATA:
     entry_size = 172
     transform_size = 64

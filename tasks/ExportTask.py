@@ -25,14 +25,24 @@ class ExportTask(Task):
             txan_data = self.data['spr'].search_entries([], 'TXAN', True)
 
             # BONE
-            # Exporting DbzBoneInfo
             bone_dict = {}
             bone_entries = bone_data[0].data.bone_entries
             if len(bone_data) > 1:
+                bone_base_data = bone_data[0].get_data()['data']
                 bone_info_data = bone_data[1].get_data()['data']['data']
+
+                if len(bone_data) > 2:
+                    bone_char_info_data = bone_data[2].get_data()['data']['data']
+                
                 for i in range(len(bone_info_data)):
+                    data = {
+                        'data': bone_base_data[i],
+                        'DbzBoneInfo': bone_info_data[i]
+                    }
+                    if len(bone_data) > 2:
+                        data[ut.b2s_name(bone_data[2].name)] = bone_char_info_data[i]
                     bone_name = ut.b2s_name(bone_entries[i].name)
-                    bone_dict[bone_name] = bone_info_data[i]
+                    bone_dict[bone_name] = data
 
             json_data = json.dumps(bone_dict, indent=4)
             data_stream = open(f"{self.output_path}\BONE.json", "w")
