@@ -27,7 +27,11 @@ class FBX:
 
         # RB axis system
         axis_system = scene.GetGlobalSettings().GetAxisSystem()
-        new_axis_system = fbx.FbxAxisSystem(fbx.FbxAxisSystem.eYAxis, fbx.FbxAxisSystem.eParityOdd, fbx.FbxAxisSystem.eRightHanded)
+        new_axis_system = fbx.FbxAxisSystem(
+            fbx.FbxAxisSystem.eYAxis, 
+            fbx.FbxAxisSystem.eParityOdd, 
+            fbx.FbxAxisSystem.eRightHanded
+        )
 
         if (axis_system != new_axis_system):
             new_axis_system.ConvertScene(scene)
@@ -69,15 +73,35 @@ class FBX:
                 self.bone_names[0] = node.GetName()
 
         nodes = []
-        model_node = root_node.FindChild('model')
+        for i in range(root_node.GetChildCount()):
+            model_node = root_node.GetChild(i)
+            if 'model' in model_node.GetName():
+                break
         self.get_children(model_node, nodes, ['FbxNull', 'FbxMesh'])
 
         self.mesh_data = {}
         self.mesh_nodes = {}
         for node in nodes:
             if node.GetMesh():
-                self.mesh_data[node.GetName()] = self.get_mesh_data(node)
-                self.mesh_nodes[node.GetName()] = node
+                name = node.GetName()
+
+                # Handling nodes with same name
+                if name in self.mesh_data:
+                    other_data = self.mesh_data[name]
+                    other_node = self.mesh_nodes[name]
+                    shape_name = name.rsplit(':')[0]
+                    parent_name = other_node.GetParent().GetName()
+                    del self.mesh_data[name]
+                    del self.mesh_nodes[name]
+                    other_name = f"{parent_name}|{shape_name}|{name}"
+                    self.mesh_data[other_name] = other_data
+                    self.mesh_nodes[other_name] = other_node
+
+                    shape_name = name.rsplit(':')[0]
+                    parent_name = node.GetParent().GetName()
+                    name = f"{parent_name}|{shape_name}|{name}"
+                self.mesh_data[name] = self.get_mesh_data(node)
+                self.mesh_nodes[name] = node
 
     def save(self, path):
         if not os.path.exists(path):
@@ -105,37 +129,32 @@ class FBX:
         for texture in self.data['texture']:
             name, ext = os.path.splitext(ut.b2s_name(texture.name))
             
-            textureData = texture.data
-            vramData = textureData.get_unswizzled_vram_data()
-            output_class = textureData.get_output_format()
+            texture_data = texture.data
+            vram_data = texture_data.get_unswizzled_vram_data()
+            output_class = texture_data.get_output_format()
             if output_class == 'BMP':
-                output_object = BMP(name, textureData.width, textureData.height, vramData)
+                output_object = BMP(name, texture_data.width, texture_data.height, vram_data)
                 output_object.save(path)
             elif output_class == 'DDS':
-                output_object = DDS(name, textureData.width, textureData.height, vramData, \
-                    textureData.get_texture_type(), textureData.mipmap_count)
+                output_object = DDS(name, texture_data.width, texture_data.height, vram_data, \
+                    texture_data.get_texture_type(), texture_data.mipmap_count)
                 output_object.save(path)
             remaining.append(output_object.get_name())
 
         # Assigning textures to materials
-        for file_name in glob.glob(f"{path}/*"):
-            base_name = os.path.basename(file_name)
-            name, ext = os.path.splitext(base_name)
-            name = ut.s2b_name(name)
-
-            # Using first eyeball texture until a proper fix for eyes is implemented
-            eyeball_count = 1
-            for material in self.data['material']:
-                if not isinstance(material.data, bytes):
-                    material.data.sort()
-                    for layer in material.data.layers:
-                        layer_base_name = layer[1].rsplit(b'.', 1)[0]
-                        layer_base_name = layer_base_name.replace(b'.', b'')
-                        if b'eyeball' in layer_base_name:
-                            layer_base_name = re.split(b'\d+$', layer_base_name, 0)[0]
-                            layer_base_name += ut.s2b_name(f".{eyeball_count}")
-                        matches = difflib.get_close_matches(ut.b2s_name(layer_base_name), remaining, len(remaining), 0)
-                        layer[1] = ut.s2b_name(matches[0])
+        # Using first eyeball texture until a proper fix for eyes is implemented
+        eyeball_count = 1
+        for material in self.data['material']:
+            if not isinstance(material.data, bytes):
+                material.data.sort()
+                for layer in material.data.layers:
+                    layer_base_name = layer[1].rsplit(b'.', 1)[0]
+                    layer_base_name = layer_base_name.replace(b'.', b'')
+                    if b'eyeball' in layer_base_name:
+                        layer_base_name = re.split(b'\d+$', layer_base_name, 0)[0]
+                        layer_base_name += ut.s2b_name(f".{eyeball_count}")
+                    matches = difflib.get_close_matches(ut.b2s_name(layer_base_name), remaining, len(remaining), 0)
+                    layer[1] = ut.s2b_name(matches[0])
 
         root_node = scene.GetRootNode()
         parent_node = root_node
@@ -178,6 +197,7 @@ class FBX:
         scene_dict = {}
         layered_names = {}
         layered_mesh_names = {}
+        mesh_parents = {}
 
         for scene_entry in scene_entries.children:
             name = ut.b2s_name(scene_entry.name)
@@ -185,8 +205,7 @@ class FBX:
             node_name = name.rsplit('|', 1)[1]
             if (scene_entry.data.layer_name != b''):
                 layer_name = ut.b2s_name(scene_entry.data.layer_name)
-                layer_name = f"[{layer_name}]{node_name}"
-                layered_names[name] = layer_name
+                layered_names[name] = f"[{layer_name}]{node_name}"
             else:
                 layered_names[name] = node_name
             name = layered_names[name]
@@ -196,16 +215,17 @@ class FBX:
             if (scene_entry.data.data_type == b'transform'):
                 gt = node.EvaluateGlobalTransform()
                 self.bind_pose.Add(node, fbx.FbxMatrix(gt))
-
+        
         # Ignoring shape nodes
         for scene_entry in scene_dict.values():
             if (scene_entry.data.data_type == b'mesh'):
+                mesh_name = ut.b2s_name(scene_entry.data.name)
                 shape_name = ut.b2s_name(scene_entry.data.parent_name)
                 transform_name = scene_dict[shape_name].data.parent_name
                 scene_entry.data.parent_name = transform_name
-                layered_mesh_names[ut.b2s_name(scene_entry.data.name)] = \
+                layered_mesh_names[mesh_name] = \
                     layered_names[ut.b2s_name(scene_entry.name)]
-
+        
         for scene_entry in scene_dict.values():
             name = ut.b2s_name(scene_entry.name)
             if scene_entry.data.data_type != b'shape':
@@ -214,14 +234,33 @@ class FBX:
                     node = root_node.FindChild(name)
                     if scene_entry.data.parent_name != b'':
                         parent_name = layered_names[ut.b2s_name(scene_entry.data.parent_name)]
+                        if scene_entry.data.data_type == b'mesh':
+                            if name in mesh_parents.keys():
+                                mesh_parents[name].append(parent_name)
+                            else:
+                                mesh_parents[name] = [parent_name]
                         parent_node = root_node.FindChild(parent_name)
                         parent_node.AddChild(node)
                     attr = fbx.FbxNull.Create(manager, '')
                     node.AddNodeAttribute(attr)
-            if (scene_entry.data.unknown0x00 == 3):
-                node.Show.Set(False)
+                    if (scene_entry.data.unknown0x00 == 3):
+                        node.Show.Set(False)
 
-        self.build_nodes(manager, scene, layered_mesh_names)
+        # Build nodes
+        for model in self.data['model']:
+            self.add_mesh_node(manager, scene, model, mesh_parents, layered_mesh_names)
+
+        nodes = []
+        for i in range(root_node.GetChildCount()):
+            model_node = root_node.GetChild(i)
+            if 'model' in model_node.GetName():
+                break
+        self.get_children(model_node, nodes, ['FbxNull', 'FbxMesh'])
+
+        # Setting hidden nodes
+        for node in nodes:
+            if not node.GetParent().Show.Get():
+                node.Show.Set(False)
 
     def get_children(self, node, node_list, class_names = []):
         if node.GetNodeAttribute():
@@ -246,9 +285,9 @@ class FBX:
                 # If node is not in the list, add it
                 nodeArray += [node]
 
-    def get_texture_uv_by_ge(self, mesh, uv_ge, polyIdx, vertIdx):
-        cp_idx = mesh.GetPolygonVertex(polyIdx, vertIdx)
-        uv_idx = mesh.GetTextureUVIndex(polyIdx, vertIdx)
+    def get_texture_uv_by_ge(self, mesh, uv_ge, poly_idx, vert_idx):
+        cp_idx = mesh.GetPolygonVertex(poly_idx, vert_idx)
+        uv_idx = mesh.GetTextureUVIndex(poly_idx, vert_idx)
         uv = (0.0, 0.0)
 
         if (uv_ge.GetMappingMode() == fbx.FbxLayerElement.eByControlPoint):
@@ -404,17 +443,29 @@ class FBX:
         data = {k: v for k, v in data.items() if v != []}
 
         return data
-
-    def build_nodes(self, manager, scene, layered_mesh_names):
-        for model in self.data['model']:
-            name = ut.b2s_name(model.name)
-            name = layered_mesh_names[name]
-            self.add_mesh_node(manager, scene, model.data, name)
     
-    def add_mesh_node(self, manager, scene, content, name):
-        data = content.get_data()
+    def add_mesh_node(self, manager, scene, content, mesh_parents, layered_mesh_names):
+        data = content.data.get_data()
         root_node = scene.GetRootNode()
-        node = root_node.FindChild(name)
+
+        name = ut.b2s_name(content.name)
+        parent_node_name = name.rsplit('|')[0]
+
+        if parent_node_name != name:          
+            found = False
+            for mesh_name, parent_list in mesh_parents.items():
+                for parent_name in parent_list:
+                    if parent_node_name in parent_name:
+                        if layered_mesh_names[name] == mesh_name:
+                            parent_node = root_node.FindChild(parent_name)
+                            node = parent_node.FindChild(mesh_name)
+                            found = True
+                            break
+                if found:
+                    break
+        else:
+            node = root_node.FindChild(layered_mesh_names[name])
+
         mesh = fbx.FbxMesh.Create(manager, f"{name}_mesh")
         node.SetNodeAttribute(mesh)
         mesh.InitControlPoints(len(data['positions'][0]['data']))
@@ -530,7 +581,12 @@ class FBX:
             print(e)
 
         # Materials
-        material_name = name.rsplit(':', 1)[1]
+        material_name_parts = name.rsplit(':')
+        if len(material_name_parts) > 2:
+            material_name = ':'.join(material_name_parts[1:])
+        else:
+            material_name = material_name_parts[1]
+        
         for material in self.data['material']:
             if ut.b2s_name(material.name) == material_name:
                 material.data.sort()
@@ -543,9 +599,10 @@ class FBX:
                     texture = self.add_texture(scene, layer[0], layer[1])
                     layered_texture.ConnectSrcObject(texture)
                 break
+        
         node.SetShadingMode(fbx.FbxNode.eTextureShading)
-
         mesh.RemoveBadPolygons()
+
         return node
 
     def add_material(self, scene, material_name):

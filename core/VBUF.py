@@ -279,7 +279,7 @@ class VBUF:
                     chunk = self.ioram_data[current_offset:current_offset + chunk_size]
                     data.append(struct.unpack(f">{format}", chunk))
 
-                decl_data.append({
+                data = {
                     'unknown0x00': unknown0x00, 
                     'resource_name': resource_name,
                     'vertex_usage': vertex_usage_txt,
@@ -287,7 +287,15 @@ class VBUF:
                     'vertex_format': format,
                     'stride': stride,
                     'data': data
-                })
+                }
+
+                # Fix for inverted UV set order
+                if (vertex_usage_txt == 'VTXUSAGE_TEXCOORD') and \
+                   (resource_name == b'uvSet'):
+                    data['resource_name'] = b'map1'
+                    decl_data.insert(0, data)
+                else:
+                    decl_data.append(data)
             except Exception as e:
                 pass
         

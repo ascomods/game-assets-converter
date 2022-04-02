@@ -354,8 +354,7 @@ class SPRPDataEntry:
         if data_offset != -1:
             self.data_offset = data_offset
         if not self.is_main_type:
-            name_offset = ut.search_index_dict(self.string_table.content, 
-            self.name)
+            name_offset = ut.search_index_dict(self.string_table.content, self.name)
             stream.write(ut.i2b(name_offset))
         if offset != -1:
             self.offset = offset

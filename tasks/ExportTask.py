@@ -77,7 +77,7 @@ class ExportTask(Task):
                 for scne_mesh_name, mesh_shape in scne_mesh_dict.items():
                     if mesh_shape == shape_name:
                         new_shape_name = scne_mesh_name.rsplit("|", 1)[1]
-                        new_shape_name = new_shape_name.rsplit(":", 1)[0]
+                        new_shape_name = new_shape_name.rsplit(':', 1)[0]
                         new_shape_name += 'Shape'
                         if new_shape_name not in new_scne_shape_dict.keys():
                             new_scne_shape_dict[new_shape_name] = shap_dict[shape_name]
@@ -98,7 +98,11 @@ class ExportTask(Task):
                         content['DbzCharMtrl'] = content['children'][0]
                         del content['children']
                     try:
-                        data.name = data.name.rsplit(b':', 1)[1]
+                        material_name_parts = data.name.rsplit(b':', 1)[1]
+                        if len(material_name_parts) > 2:
+                            data.name = b':'.join(material_name_parts[1:])
+                        else:
+                            data.name = material_name_parts[1]
                     except:
                         pass
                     mtrl_dict[ut.b2s_name(data.name)] = content

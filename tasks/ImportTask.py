@@ -213,6 +213,11 @@ class ImportTask(Task):
             for mesh_name, data in fbx_object.mesh_data.items():
                 layered_mesh_name = mesh_name
                 layer_name, mesh_name = self.format_name(mesh_name, '', '')
+                base_mesh_name = mesh_name
+                try:
+                    mesh_name = mesh_name.rsplit('|', 1)[1]
+                except IndexError:
+                    pass
                 mesh_name = ut.s2b_name(mesh_name)
 
                 try:
@@ -303,8 +308,14 @@ class ImportTask(Task):
                                 vbuf_object.data[vtx_usage].append(decl_data)
                                 index += 1
                     try:
-                        material_name = mesh_name.rsplit(b':', 1)[1]
-                    except:
+                        material_name_parts = mesh_name.rsplit(b':')
+                        if len(material_name_parts) > 2:
+                            material_name = b':'.join(material_name_parts[1:])
+                        else:
+                            material_name = material_name_parts[1]
+                    except Exception as e:
+                        print(mesh_name)
+                        print(e)
                         material_name = mesh_name + b'_mat'
                     string_list.append(material_name)
 
@@ -346,7 +357,10 @@ class ImportTask(Task):
 
                     # Shapes
                     try:
-                        shape_name = mesh_name.split(b':')[0]
+                        if base_mesh_name != ut.b2s_name(mesh_name):
+                            shape_name = ut.s2b_name(base_mesh_name.split(':')[0])
+                        else:
+                            shape_name = mesh_name.split(b':')[0]
                     except:
                         shape_name = mesh_name
                     shap_name = shape_name + b'Shape'
@@ -406,7 +420,15 @@ class ImportTask(Task):
                             decl_list[index] = b'eyeball'
                             vbuf_object.vertex_decl[i] = tuple(decl_list)
 
-                vbuf_name = ut.s2b_name(f"{ut.b2s_name(shap_name)}:{ut.b2s_name(mesh_name.split(b':')[1])}")
+                if base_mesh_name != ut.b2s_name(mesh_name):
+                    vbuf_name = ut.s2b_name(base_mesh_name)
+                else:
+                    mesh_name_parts = mesh_name.rsplit(b':')
+                    if len(mesh_name_parts) > 2:
+                        name = b':'.join(mesh_name_parts[1:])
+                    else:
+                        name = mesh_name_parts[1]
+                    vbuf_name = ut.s2b_name(f"{ut.b2s_name(shap_name)}:{ut.b2s_name(name)}")
                 string_list.append(vbuf_name)
                 spr_data_entry = SPRPDataEntry(b'VBUF', vbuf_name, spr_object.string_table, True)
                 spr_data_entry.data = vbuf_object
@@ -451,7 +473,11 @@ class ImportTask(Task):
 
                 # SCNE Mesh
                 scene_mesh_name  = ut.s2b_name(f"{parent_names[0]}|{ut.b2s_name(mesh_name)}")
-                scene_shape_name = ut.s2b_name(f"{parent_names[0]}|{ut.b2s_name(shape_name)}")
+                if base_mesh_name != ut.b2s_name(mesh_name):
+                    name = ut.b2s_name(shape_name).rsplit('|', 1)[1]
+                    scene_shape_name = ut.s2b_name(f"{parent_names[0]}|{name}")
+                else:
+                    scene_shape_name = ut.s2b_name(f"{parent_names[0]}|{ut.b2s_name(shape_name)}")
                 string_list.append(scene_mesh_name)
                 scne_mesh_object = SCNE('', vbuf_name, spr_object.string_table)
                 scne_mesh_object.data_type = b'mesh'
