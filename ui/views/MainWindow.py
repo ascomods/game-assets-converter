@@ -334,7 +334,7 @@ class Ui_MainWindow(object):
 
     def retranslateUi(self, MainWindow):
         _translate = QtCore.QCoreApplication.translate
-        self.title_label.setText(_translate("MainWindow", "Game Assets Converter v2.0"))
+        self.title_label.setText(_translate("MainWindow", "Game Assets Converter v2.2.6"))
         self.minimize_btn.setToolTip(_translate("MainWindow", "Minimize"))
         self.exit_btn.setToolTip(_translate("MainWindow", "Exit"))
         self.author_label.setText(_translate("MainWindow", "by Ascomods"))

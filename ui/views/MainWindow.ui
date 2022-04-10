@@ -166,7 +166,7 @@ QScrollBar::sub-line:vertical {
            <string notr="true"/>
           </property>
           <property name="text">
-           <string>Game Assets Converter v2.0</string>
+           <string>Game Assets Converter v2.2.6</string>
           </property>
          </widget>
          <widget class="QFrame" name="title_btns_frame">
