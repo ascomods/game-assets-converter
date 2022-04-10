@@ -25,28 +25,31 @@ class ExportTask(Task):
             txan_data = self.data['spr'].search_entries([], 'TXAN', True)
 
             # BONE
-            bone_dict = {}
-            bone_entries = bone_data[0].data.bone_entries
-            if len(bone_data) > 1:
-                bone_base_data = bone_data[0].get_data()['data']
-                bone_info_data = bone_data[1].get_data()['data']['data']
+            try:
+                bone_dict = {}
+                bone_entries = bone_data[0].data.bone_entries
+                if len(bone_data) > 1:
+                    bone_base_data = bone_data[0].get_data()['data']
+                    bone_info_data = bone_data[1].get_data()['data']['data']
 
-                if len(bone_data) > 2:
-                    bone_char_info_data = bone_data[2].get_data()['data']['data']
-                
-                for i in range(len(bone_info_data)):
-                    data = {
-                        'data': bone_base_data[i],
-                        'DbzBoneInfo': bone_info_data[i]
-                    }
                     if len(bone_data) > 2:
-                        data[ut.b2s_name(bone_data[2].name)] = bone_char_info_data[i]
-                    bone_name = ut.b2s_name(bone_entries[i].name)
-                    bone_dict[bone_name] = data
+                        bone_char_info_data = bone_data[2].get_data()['data']['data']
+                    
+                    for i in range(len(bone_info_data)):
+                        data = {
+                            'data': bone_base_data[i],
+                            'DbzBoneInfo': bone_info_data[i]
+                        }
+                        if len(bone_data) > 2:
+                            data[ut.b2s_name(bone_data[2].name)] = bone_char_info_data[i]
+                        bone_name = ut.b2s_name(bone_entries[i].name)
+                        bone_dict[bone_name] = data
 
-            json_data = json.dumps(bone_dict, indent=4)
-            data_stream = open(f"{self.output_path}\BONE.json", "w")
-            data_stream.write(str(json_data))
+                json_data = json.dumps(bone_dict, indent=4)
+                data_stream = open(f"{self.output_path}\BONE.json", "w")
+                data_stream.write(str(json_data))
+            except:
+                print('Bone data is missing')
 
             self.send_progress(10)
 
@@ -137,7 +140,7 @@ class ExportTask(Task):
                         eye_texture_names.append(entry.name.replace(b'.tga', b'.dds'))
                 
                 for i in range(len(txan_data.entries)):
-                    idx = i % len(eye_texture_names)
+                    idx = abs((len(eye_texture_names) - 1) - i) % len(eye_texture_names)
                     txan_data.entries[i].name = eye_texture_names[idx]
 
                 json_data = json.dumps(txan_data.get_data(), indent=4)

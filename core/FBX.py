@@ -5,8 +5,8 @@ import numpy as np
 import math
 import re
 import os
-import glob
 import core.utils as ut
+import core.common as cm
 from .BMP import BMP
 from .DDS import DDS
 
@@ -58,7 +58,10 @@ class FBX:
                         node_dict[parent_name].AddChild(node)
 
         nodes = []
-        null_node = root_node.FindChild('NULL')
+        for i in range(root_node.GetChildCount()):
+            null_node = root_node.GetChild(i)
+            if 'NULL' in null_node.GetName():
+                break
         self.get_children(null_node, nodes, ['FbxNull', 'FbxSkeleton'])
 
         index = 0
@@ -85,21 +88,26 @@ class FBX:
             if node.GetMesh():
                 name = node.GetName()
 
-                # Handling nodes with same name
-                if name in self.mesh_data:
-                    other_data = self.mesh_data[name]
-                    other_node = self.mesh_nodes[name]
-                    shape_name = name.rsplit(':')[0]
-                    parent_name = other_node.GetParent().GetName()
-                    del self.mesh_data[name]
-                    del self.mesh_nodes[name]
-                    other_name = f"{parent_name}|{shape_name}|{name}"
-                    self.mesh_data[other_name] = other_data
-                    self.mesh_nodes[other_name] = other_node
+                # Fix for chars with duplicated parts using "face_" in material
+                material_name = name.rsplit(':')[-1]
+                name_parts = name.rsplit(':')[0:-1]
+                if 'face_' in material_name:
+                    name_parts.append(material_name.replace('face_', ''))
+                else:
+                    name_parts.append(f"face_{material_name}")
+                test_name = ':'.join(name_parts)
+                for mesh_name in self.mesh_data.keys():
+                    if test_name in mesh_name.rsplit('|')[-1]:
+                        self.use_full_node_name(mesh_name)
+                        break
+                
+                unlayered_name = self.remove_layer_from_name(name)
+                for mesh_name in self.mesh_data.keys():
+                    if unlayered_name in mesh_name:
+                        self.use_full_node_name(mesh_name)
+                        name = self.get_full_node_name(node)
+                        break
 
-                    shape_name = name.rsplit(':')[0]
-                    parent_name = node.GetParent().GetName()
-                    name = f"{parent_name}|{shape_name}|{name}"
                 self.mesh_data[name] = self.get_mesh_data(node)
                 self.mesh_nodes[name] = node
 
@@ -158,40 +166,42 @@ class FBX:
 
         root_node = scene.GetRootNode()
         parent_node = root_node
-        bone_entries = self.data['bone'][0].data.bone_entries
-        self.bone_nodes = []
+
         self.bind_pose = fbx.FbxPose.Create(scene, "Default")
         self.bind_pose.SetIsBindPose(True)
+        if len(self.data['bone']) > 0:
+            bone_entries = self.data['bone'][0].data.bone_entries
+            self.bone_nodes = []
 
-        for bone in bone_entries:
-            node = fbx.FbxNode.Create(parent_node, bone.name)
-            self.bone_nodes.append(node)
-            attr = fbx.FbxNull.Create(manager, '')
-            node.AddNodeAttribute(attr)
+            for bone in bone_entries:
+                node = fbx.FbxNode.Create(parent_node, bone.name)
+                self.bone_nodes.append(node)
+                attr = fbx.FbxNull.Create(manager, '')
+                node.AddNodeAttribute(attr)
 
-            skeleton_attribute = fbx.FbxSkeleton.Create(parent_node, bone.name)
+                skeleton_attribute = fbx.FbxSkeleton.Create(parent_node, bone.name)
 
-            if bone.parent != None:
-                parent_node = root_node.FindChild(ut.b2s_name(bone.parent.name))
-                skeleton_attribute.SetSkeletonType(fbx.FbxSkeleton.eLimbNode)
-            else:
-                skeleton_attribute.SetSkeletonType(fbx.FbxSkeleton.eRoot)
-            node.SetNodeAttribute(skeleton_attribute)
+                if bone.parent != None:
+                    parent_node = root_node.FindChild(ut.b2s_name(bone.parent.name))
+                    skeleton_attribute.SetSkeletonType(fbx.FbxSkeleton.eLimbNode)
+                else:
+                    skeleton_attribute.SetSkeletonType(fbx.FbxSkeleton.eRoot)
+                node.SetNodeAttribute(skeleton_attribute)
 
-            if bone.parent != None:
-                mat = np.linalg.inv(bone.parent.abs_transform) @ bone.abs_transform
-            else:
-                mat = bone.abs_transform
-            
-            trans, rot, scale = self.mat44_to_TRS(mat)
+                if bone.parent != None:
+                    mat = np.linalg.inv(bone.parent.abs_transform) @ bone.abs_transform
+                else:
+                    mat = bone.abs_transform
+                
+                trans, rot, scale = self.mat44_to_TRS(mat)
 
-            node.LclTranslation.Set(fbx.FbxDouble3(*tuple(trans)[:3]))
-            node.LclRotation.Set(fbx.FbxDouble3(*tuple(rot)[:3]))
-            node.LclScaling.Set(fbx.FbxDouble3(*tuple(scale)[:3]))
-            parent_node.AddChild(node)
+                node.LclTranslation.Set(fbx.FbxDouble3(*tuple(trans)[:3]))
+                node.LclRotation.Set(fbx.FbxDouble3(*tuple(rot)[:3]))
+                node.LclScaling.Set(fbx.FbxDouble3(*tuple(scale)[:3]))
+                parent_node.AddChild(node)
 
-            gt = node.EvaluateGlobalTransform()
-            self.bind_pose.Add(node, fbx.FbxMatrix(gt))
+                gt = node.EvaluateGlobalTransform()
+                self.bind_pose.Add(node, fbx.FbxMatrix(gt))
 
         scene_entries = self.data['scene'][0].search_entries([], '[NODES]')[0]
         scene_dict = {}
@@ -246,15 +256,29 @@ class FBX:
                     if (scene_entry.data.unknown0x00 == 3):
                         node.Show.Set(False)
 
-        # Build nodes
-        for model in self.data['model']:
-            self.add_mesh_node(manager, scene, model, mesh_parents, layered_mesh_names)
-
         nodes = []
         for i in range(root_node.GetChildCount()):
             model_node = root_node.GetChild(i)
             if 'model' in model_node.GetName():
                 break
+
+        nodes_to_remove = ['model', 'body', 'head', 'face']
+        for mesh_name, parent_list in mesh_parents.items():
+            node_array = []
+            node = model_node.FindChild(mesh_name)
+            self.add_node_recursively(node_array, node)
+            node_name_array = \
+                [x.GetName() for x in node_array if x.GetName() not in nodes_to_remove]
+            node_name_array.remove(mesh_name)
+
+            for node_name in node_name_array:
+                if node_name not in parent_list:
+                    mesh_parents[mesh_name].append(node_name)
+
+        # Build nodes
+        for model in self.data['model']:
+            self.add_mesh_node(manager, scene, model, mesh_parents, layered_mesh_names)
+
         self.get_children(model_node, nodes, ['FbxNull', 'FbxMesh'])
 
         # Setting hidden nodes
@@ -274,16 +298,16 @@ class FBX:
                     elif child.GetNodeAttribute().GetClassId().GetName() in class_names:
                         self.get_children(child, node_list, class_names)
 
-    def add_node_recursively(self, nodeArray, node):
+    def add_node_recursively(self, node_array, node):
         if node:
-            self.add_node_recursively(nodeArray, node.GetParent())
+            self.add_node_recursively(node_array, node.GetParent())
             found = False
-            for elt in nodeArray:
+            for elt in node_array:
                 if elt.GetName() == node.GetName():
                     found = True
             if not found and (node.GetName() != 'RootNode'):
                 # If node is not in the list, add it
-                nodeArray += [node]
+                node_array += [node]
 
     def get_texture_uv_by_ge(self, mesh, uv_ge, poly_idx, vert_idx):
         cp_idx = mesh.GetPolygonVertex(poly_idx, vert_idx)
@@ -451,7 +475,7 @@ class FBX:
         name = ut.b2s_name(content.name)
         parent_node_name = name.rsplit('|')[0]
 
-        if parent_node_name != name:          
+        if parent_node_name != name:   
             found = False
             for mesh_name, parent_list in mesh_parents.items():
                 for parent_name in parent_list:
@@ -503,29 +527,30 @@ class FBX:
             bone_weights = []
             bone_mats = []
             
-            for bone in self.bone_nodes:
-                bone_mats.append(bone.EvaluateGlobalTransform())
-            
-            cluster_dict = {}
-            for i in range(0, len(data['bone_indices'][0]['data'])):
-                for j in range(0, len(data['bone_indices'])): 
-                    bone_indices.append(data['bone_indices'][j]['data'][i][0])
-                    bone_weights.append(data['bone_weights'][j]['data'][i][0])
+            if hasattr(self, 'bone_nodes'):
+                for bone in self.bone_nodes:
+                    bone_mats.append(bone.EvaluateGlobalTransform())
                 
-                for k in range(0, len(bone_indices)):
-                    bone_idx = bone_indices[k]
-                    if bone_idx not in cluster_dict:
-                        cluster_dict[bone_idx] = fbx.FbxCluster.Create(scene, "")
-                        cluster_dict[bone_idx].SetLinkMode(fbx.FbxCluster.eTotalOne)
-                        boneNode = self.bone_nodes[bone_idx]
-                        cluster_dict[bone_idx].SetLink(boneNode)
-                        cluster_dict[bone_idx].SetTransformMatrix(nodeMat)
-                        cluster_dict[bone_idx].SetTransformLinkMatrix(bone_mats[bone_idx])
-                        skin.AddCluster(cluster_dict[bone_idx])
-                    cluster_dict[bone_idx].AddControlPointIndex(i, bone_weights[k])
-                
-                bone_indices = []
-                bone_weights = []
+                cluster_dict = {}
+                for i in range(0, len(data['bone_indices'][0]['data'])):
+                    for j in range(0, len(data['bone_indices'])): 
+                        bone_indices.append(data['bone_indices'][j]['data'][i][0])
+                        bone_weights.append(data['bone_weights'][j]['data'][i][0])
+                    
+                    for k in range(0, len(bone_indices)):
+                        bone_idx = bone_indices[k]
+                        if bone_idx not in cluster_dict:
+                            cluster_dict[bone_idx] = fbx.FbxCluster.Create(scene, "")
+                            cluster_dict[bone_idx].SetLinkMode(fbx.FbxCluster.eTotalOne)
+                            boneNode = self.bone_nodes[bone_idx]
+                            cluster_dict[bone_idx].SetLink(boneNode)
+                            cluster_dict[bone_idx].SetTransformMatrix(nodeMat)
+                            cluster_dict[bone_idx].SetTransformLinkMatrix(bone_mats[bone_idx])
+                            skin.AddCluster(cluster_dict[bone_idx])
+                        cluster_dict[bone_idx].AddControlPointIndex(i, bone_weights[k])
+                    
+                    bone_indices = []
+                    bone_weights = []
             mesh.AddDeformer(skin)
             self.bind_pose.Add(node, fbx.FbxMatrix(node.EvaluateGlobalTransform()))
         except Exception as e:
@@ -658,3 +683,36 @@ class FBX:
         r = [x * (180 / math.pi) for x in r]
         
         return tuple(r), scale
+
+    def use_full_node_name(self, node_name):
+        data = self.mesh_data[node_name]
+        node = self.mesh_nodes[node_name]
+        new_name = self.get_full_node_name(node)
+
+        del self.mesh_data[node_name]
+        del self.mesh_nodes[node_name]
+
+        self.mesh_data[new_name] = data
+        self.mesh_nodes[new_name] = node
+
+    def get_full_node_name(self, node, nodes_to_remove = ['model', 'body', 'head']):
+        node_array = []
+        self.add_node_recursively(node_array, node)
+
+        name_parts = []
+        for elt in node_array:
+            name = self.remove_layer_from_name(elt.GetName())
+            if name not in nodes_to_remove:
+                name_parts.append(name)
+
+        shape_name = name_parts[-1].rsplit(':')[0]
+        name_parts.insert(len(name_parts) - 1, shape_name)
+
+        return '|'.join(name_parts)
+    
+    def remove_layer_from_name(self, name):
+        layer_name = re.findall(r'^\[(.*?)\]', name)
+        if layer_name != []:
+            layer_name = layer_name[0]
+            return name.replace(f"[{layer_name}]", '')
+        return name

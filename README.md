@@ -22,12 +22,12 @@ Python version: `3.7.9`
 
 Dependencies:
 ```
-natsort    			  -->    7.1.1
-numpy      			  -->    1.20.0
-observed   			  -->    0.5.3
-PyQt5     			  -->    5.15.4
-QtAwesome  			  -->    1.1.0
-FBX Python Bindings	  -->    2020.0.1
+natsort: 7.1.1
+numpy: 1.20.0
+observed: 0.5.3
+PyQt5: 5.15.4
+QtAwesome: 1.1.0
+FBX Python SDK: 2020.0.1
 ```
 Install libraries using pip:
 ```

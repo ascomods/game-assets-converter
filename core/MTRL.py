@@ -33,10 +33,11 @@ class MTRL:
             try:
                 layer_name = self.string_table.content[ut.b2i(stream.read(4))]
                 source_name = self.string_table.content[ut.b2i(stream.read(4))]
+                source_name = ut.format_jap_name(source_name)
                 self.layers.append([layer_name, source_name])
             except Exception as e:
                 pass
-
+    
     def write(self, stream, write_data = True):
         self.offset = abs(stream.tell() - self.data_offset)
         self.name_offset = ut.search_index_dict(self.string_table.content, self.name)

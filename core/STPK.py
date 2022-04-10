@@ -1,5 +1,6 @@
 import os
 import core.utils as ut
+import core.common as cm
 from .SPRP import SPRP
 
 class STPK:
@@ -65,7 +66,11 @@ class STPK:
 
         stream.write(bytes(self.entry_size * len(self.entries)))
         if self.add_extra_bytes:
-            stream.write(bytes(64)) # Extra bytes for console support
+            # Extra bytes for console support
+            if cm.selected_platform == 'x360':
+                stream.write(bytes(4032))
+            else:
+                stream.write(bytes(64))
         if self.entries[-1].get_size() == 0:
             stream.write(bytes(16))
         self.write_data(stream)

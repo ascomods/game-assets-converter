@@ -291,8 +291,9 @@ class VBUF:
 
                 # Fix for inverted UV set order
                 if (vertex_usage_txt == 'VTXUSAGE_TEXCOORD') and \
-                   (resource_name == b'uvSet'):
-                    data['resource_name'] = b'map1'
+                   (resource_name in [b'uvSet', b'eyeball']):
+                    if resource_name == b'uvSet':
+                        data['resource_name'] = b'map1'
                     decl_data.insert(0, data)
                 else:
                     decl_data.append(data)

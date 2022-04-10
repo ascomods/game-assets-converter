@@ -25,6 +25,8 @@ def search_index_dict(dict, search_val):
     for key, val in dict.items():
         if val == search_val:
             return key
+    if len(search_val) > 0:
+        print(search_val)
     raise Exception("Key not found in dict")
 
 def keep_cursor_pos(function):
@@ -89,6 +91,14 @@ def b2s_name(bytes):
 def s2b_name(string):
     return string.encode('latin1')
 
+def format_jap_name(string):
+    try:
+        string.decode('utf-8')
+    except:
+        name_parts = string.rsplit(b'_')[1:]
+        string = b'_'.join(name_parts)
+    return string
+
 def read_until(stream, offset, endChar = b'\x00'):
     initial_pos = stream.tell()
     stream.seek(offset)
@@ -119,5 +129,5 @@ def on_rm_error(func, path, exc_info):
     os.chmod( path, stat.S_IWRITE )
     os.unlink( path )
 
-def printHex(data):
+def print_hex(data):
     print(''.join(r' '+hex(letter)[2:] for letter in data))

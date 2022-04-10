@@ -1,4 +1,6 @@
 import core.utils as ut
+import core.common as cm
+import core.swizzle as sw
 import struct
 
 class TX2D:
@@ -57,8 +59,11 @@ class TX2D:
     def get_texture_type(self):
         if hex(self.texture_type) == '0x8000000':
             return 'DXT1'
-        elif (hex(self.texture_type) == '0x18000000') or \
-             (hex(self.texture_type) == '0x20000000'):
+        elif (hex(self.texture_type) == '0x18000000'):
+            return 'DXT5'
+        elif (hex(self.texture_type) == '0x20000000'):
+            if cm.selected_platform == 'x360':
+                return 'ATI2'
             return 'DXT5'
         elif self.texture_type == 0: # r8g8b8a8_typeless
             return '27'
@@ -66,29 +71,45 @@ class TX2D:
 
     def get_swizzled_vram_data(self):
         data = self.vram_data
-        if self.get_texture_type() == '27':
+        texture_type = self.get_texture_type()
+
+        if texture_type == '27':
             data = bytearray()
             for i in range(0, len(self.vram_data), 4):
                 elt = self.vram_data[i:i+4]
                 # Swap bytes
                 data.extend(struct.pack("<I", struct.unpack(">I", elt)[0]))
+        elif cm.selected_platform == 'x360':
+            # Using 1 mipmap as temporary fix
+            self.mipmap_count = 1
+            self.mipmap_count, data = \
+                sw.XBOX.process(data, self.width, self.height, \
+                    self.mipmap_count, texture_type, 'swizzle')
+        
         return data
 
     def get_unswizzled_vram_data(self):
         data = self.vram_data
-        if self.get_texture_type() == '27':
+        texture_type = self.get_texture_type()
+
+        if texture_type == '27':
             data = bytearray()
             for i in range(0, len(self.vram_data), 4):
                 elt = self.vram_data[i:i+4]
                 # Swap bytes
                 data.extend(struct.pack("<I", struct.unpack(">I", elt)[0]))
+        elif cm.selected_platform == 'x360':
+            self.mipmap_count, data = \
+                sw.XBOX.process(data, self.width, self.height, \
+                    self.mipmap_count, texture_type)
+        
         return data
     
     def get_output_format(self):
         texture_type = self.get_texture_type()
-        if (texture_type == 'DXT1') or (texture_type == 'DXT5'):
+        if texture_type in ['DXT1', 'DXT5', 'ATI2']:
             return 'DDS'
-        elif (texture_type == '27'):
+        elif texture_type == '27':
             return 'BMP'
         return 'unknown'
 

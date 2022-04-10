@@ -307,6 +307,7 @@ class SPRPDataEntry:
                 elif b'DbzEyeInfo' in self.name:
                     data_object = SCNE_EYE_INFO('', b'', self.string_table, self.size)
             elif self.type == b'TX2D':
+                self.name = ut.format_jap_name(self.name)
                 data_object = TX2D('', self.name, self.string_table)
             elif self.type == b'MTRL':
                 if b'DbzCharMtrl' in self.name:
@@ -316,7 +317,7 @@ class SPRPDataEntry:
             elif self.type == b'SHAP':
                 data_object = SHAP('', self.name, self.string_table)
             elif self.type == b'BONE':
-                if self.name == b'NULL':
+                if self.name in [b'BONE_NULL', b'NULL']:
                     data_object = BONE('', self.name)
                 elif self.name == b'DbzBoneInfo':
                     data_object = BONE_INFO('', b'', self.size)

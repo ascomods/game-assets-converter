@@ -1,6 +1,6 @@
 import os
 
-temp_path = os.path.split(os.path.realpath(__file__))[0] + "/../temp/"
+temp_path = os.path.abspath(os.path.dirname(__file__) + '/../temp')
 
 class_map = {
     b'SPR3': b'SPRP'
@@ -12,7 +12,8 @@ games = {
 }
 
 platforms = {
-    'ps3' : 'PS3'
+    'ps3' : 'PS3',
+    'x360' : 'XBOX 360'
 }
 
 selected_game = 'dbrb2'

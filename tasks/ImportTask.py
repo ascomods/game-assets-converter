@@ -20,6 +20,7 @@ from core.SHAP import *
 from core.VBUF import *
 from core.FBX import *
 import core.utils as ut
+import core.common as cm
 
 class ImportTask(Task):
     def __init__(self, data, input_path, spr_path, ioram_path, vram_path, other_files):
@@ -361,14 +362,39 @@ class ImportTask(Task):
                         if mtrl_data != None:
                             mtrl_object.load_data(mtrl_data)
                         for layer in data['materials']:
-                            # Textures                   
+                            # Textures
                             layer_name, source_name, texture_names, spr_data_entry = \
                                 self.add_texture(spr_object, texture_names, layer[0], layer[1])
                             if spr_data_entry != None:
                                 spr['TX2D'].entries.append(spr_data_entry)
                             string_list.append(layer_name)
+
+                            # name_parts = source_name.rsplit(b'.')
+                            # if len(name_parts) > 2:
+                            #     # source_name = name_parts[0]
+                            #     # if b'EYEBALL1' in material_name:
+                            #     #     source_name += ut.s2b_name('11')
+                            #     num = int(name_parts[1])
+                            #     if b'EYEBALL1' in material_name:
+                            #         num += 1
+                            #     source_name = \
+                            #         b'.'.join([name_parts[0], ut.s2b_name(str(num)), name_parts[2]])
                             string_list.append(source_name)
                             mtrl_object.layers.append((layer_name, source_name))
+
+                            # Textures not in materials
+                            name_parts = layer[1].rsplit('.')
+                            if len(name_parts) > 2:
+                                num = int(name_parts[1]) + 1
+                                texture_path = '.'.join([name_parts[0], str(num), name_parts[2]])
+                                while os.path.exists(texture_path):
+                                    layer_name, source_name, texture_names, spr_data_entry = \
+                                        self.add_texture(spr_object, texture_names, '', texture_path)
+                                    if spr_data_entry != None:
+                                        spr['TX2D'].entries.append(spr_data_entry)
+                                    string_list.append(source_name)
+                                    num += 1
+                                    texture_path = '.'.join([name_parts[0], str(num), name_parts[2]])
                         mtrl_object.sort(True)
                         
                         spr_data_entry = SPRPDataEntry(b'MTRL', material_name, spr_object.string_table, True)
@@ -574,21 +600,23 @@ class ImportTask(Task):
             scne_nodes_entry.children = scne_parts.values()
             scne_nodes_entry.sort(True)
 
-            string_list.append(b'DbzEyeInfo')
-            scne_eye_info_object = SCNE_EYE_INFO('', b'DbzEyeInfo', spr_object.string_table)
-            scne_eye_info_object.load_data(scne_dict['DbzEyeInfo'])
-            for entry in scne_eye_info_object.eye_entries:
-                if entry.name != b'':
-                    string_list.append(entry.name)
-            scne_eye_info_entry = SPRPDataEntry(b'SCNE', b'DbzEyeInfo', spr_object.string_table)
-            scne_eye_info_entry.data = scne_eye_info_object
+            if 'DbzEyeInfo' in scne_dict.keys():
+                string_list.append(b'DbzEyeInfo')
+                scne_eye_info_object = SCNE_EYE_INFO('', b'DbzEyeInfo', spr_object.string_table)
+                scne_eye_info_object.load_data(scne_dict['DbzEyeInfo'])
+                for entry in scne_eye_info_object.eye_entries:
+                    if entry.name != b'':
+                        string_list.append(entry.name)
+                scne_eye_info_entry = SPRPDataEntry(b'SCNE', b'DbzEyeInfo', spr_object.string_table)
+                scne_eye_info_entry.data = scne_eye_info_object
 
             scene_name = ut.s2b_name(f"{fbx_name}.fbx")
             string_list.append(scene_name)
             scne_main_entry = SPRPDataEntry(b'SCNE', scene_name, spr_object.string_table, True)
             scne_main_entry.children.append(scne_layers_entry)
             scne_main_entry.children.append(scne_nodes_entry)
-            scne_main_entry.children.append(scne_eye_info_entry)
+            if 'DbzEyeInfo' in scne_dict.keys():
+                scne_main_entry.children.append(scne_eye_info_entry)
             spr['SCNE'].entries.append(scne_main_entry)
 
             for name, content in drvn_dict.items():
@@ -643,16 +671,18 @@ class ImportTask(Task):
                 vram_data.extend(data)
                 padding_lenght = padding - len(data)
 
-                if tx2d_object.get_texture_type() == 'DXT1':
-                    if tx2d_object.width == tx2d_object.height:
-                        padding_lenght += 80
-                    else:
-                        padding_lenght += 32
-                elif tx2d_object.get_texture_type() == 'DXT5':
-                    if tx2d_object.width == tx2d_object.height:
-                        padding_lenght += 48
-                    else:
-                        padding_lenght += 80
+                if cm.selected_platform == 'ps3':
+                    if cm.selected_game == 'dbrb2':
+                        if tx2d_object.get_texture_type() == 'DXT1':
+                            if tx2d_object.width == tx2d_object.height:
+                                padding_lenght += 80
+                            else:
+                                padding_lenght += 32
+                        elif tx2d_object.get_texture_type() in ['DXT5', 'ATI2']:
+                            if tx2d_object.width == tx2d_object.height:
+                                padding_lenght += 48
+                            else:
+                                padding_lenght += 80
 
                 vram_data.extend(bytes(padding_lenght))
 
@@ -756,12 +786,17 @@ class ImportTask(Task):
                 if tex_object.type == b'DXT1':
                     tx2d_object.texture_type = int('0x8000000', base=16)
                 elif tex_object.type == b'DXT5':
+                    tx2d_object.unknown0x00 = ut.b2i(b'\x22')
                     tx2d_object.texture_type = int('0x18000000', base=16)
+                elif tex_object.type == b'ATI2':
+                    tx2d_object.texture_type = int('0x20000000', base=16)
                 tx2d_object.mipmap_count = tex_object.mipmap_count
                 tx2d_object.height = tex_object.height
                 tx2d_object.width = tex_object.width
             
             if (b'TOONMAP' in layer_name) or (b'_RAMP' in layer_name):
+                if cm.selected_platform == 'x360':
+                    tx2d_object.unknown0x00 = ut.b2i(b'\x82')
                 tx2d_object.unknown0x1C = ut.b2i(b'\xA7\x2D\x0A\x80')
             else:
                 tx2d_object.unknown0x1C = ut.b2i(b'\xA7\x28\x0A\x80')
