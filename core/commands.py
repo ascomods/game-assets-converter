@@ -19,7 +19,7 @@ def dbrb_compressor(input_path, output_path):
                 output_path
             ],
             stdout=subprocess.DEVNULL)
-            os.chmod(output_path, stat.S_IWRITE)
+            os.chmod(output_path, stat.S_IWRITE | stat.S_IREAD)
             break
         except Exception as e:
             pass

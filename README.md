@@ -2,7 +2,7 @@
 
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 
-*Copyright © 2021-2022 Ascomods*
+*Copyright © 2021-2023 Ascomods*
 
 ## Description
 
@@ -14,7 +14,7 @@ Game Compatibility List:
 DragonBall Raging Blast 2 (PS3)
 ```
 
-Credits to revel8n, adsl14, SamuelDoesStuff, HiroTex and to the rest of the RB modding community for their contributions.
+Credits to revel8n, adsl14, SamuelDoesStuff, HiroTex, Olganix and to the rest of the RB modding community for their contributions.
 
 ## Building
 
@@ -25,9 +25,9 @@ Dependencies:
 natsort: 7.1.1
 numpy: 1.20.0
 observed: 0.5.3
-PyQt5: 5.15.4
+PyQt5: 5.10.1
 QtAwesome: 1.1.0
-FBX Python SDK: 2020.0.1
+FBX Python SDK: 2020.2.1
 ```
 Install libraries using pip:
 ```

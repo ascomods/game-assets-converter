@@ -29,6 +29,12 @@ def search_index_dict(dict, search_val):
         print(search_val)
     raise Exception("Key not found in dict")
 
+# Search value in list values of dict
+def search_index_dict_list(dict, search_val):
+    for key, search_list in dict.items():
+        if (isinstance(search_list, list) and (search_val in search_list)):
+            return key
+
 def keep_cursor_pos(function):
     """
     restores cursor position after function execution
