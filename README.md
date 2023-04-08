@@ -27,7 +27,7 @@ numpy: 1.20.0
 observed: 0.5.3
 PyQt5: 5.10.1
 QtAwesome: 1.1.0
-FBX Python SDK: 2020.2.1
+FBX Python SDK: 2020.2.1 (provided in the libs folder)
 ```
 Install libraries using pip:
 ```

@@ -7,6 +7,7 @@ import re
 import os
 import core.utils as ut
 import core.common as cm
+import core.commands as cmd
 from .BMP import BMP
 from .DDS import DDS
 
@@ -354,49 +355,26 @@ class FBX:
         for i in range(mesh.GetControlPointsCount()):
             new_vertex_indices.append([])
 
+        # Using NviTriStripper to generate the strip indices then build the strip
         j = 0
-        diffs = []
-        indices = []
-        last_indices = []
-        poly_indices = []
-
+        tri_indices = []
         for i in range(mesh.GetPolygonCount()):
             indices = [mesh.GetPolygonVertex(i, j) for j in range(3)]
-            vert_nums = [j for j in range(3)]
-            vert_indices = []
+            tri_indices.extend(indices)
+        tri_indices_text = str(tri_indices).replace(" ", "").replace("[", "").replace("]", "")
 
-            if (i == 0):
-                diffs = indices[:]
-            else:
-                diffs = [x for x in indices if x not in last_indices]
+        tri_input = open(f"{cm.temp_path}/triangles.txt", "w")
+        tri_input.write(tri_indices_text)
+        tri_input.flush()
 
-            if (i % 2 != 0):
-                indices[1], indices[2] = indices[2], indices[1]
-                vert_nums[1], vert_nums[2] = vert_nums[2], vert_nums[1]
+        cmd.nvtri_stripper(f"{cm.temp_path}\\triangles.txt", f"{cm.temp_path}\\triangles_out.txt")
+        tri_output = open(f"{cm.temp_path}\\triangles_out.txt", "r")
+        strip_indices = eval(tri_output.readline().strip())
 
-            if (i > 0):
-                if (last_indices[-2:] != indices[:2]):
-                    data['positions'][0]['data'].append(mesh.GetControlPointAt(last_indices[-1]))
-                    new_vertex_indices[last_indices[-1]].append(j)
-                    poly_indices[-1].append(poly_indices[-1][-1])
-                    j += 1
-
-                    data['positions'][0]['data'].append(mesh.GetControlPointAt(indices[0]))
-                    new_vertex_indices[indices[0]].append(j)
-                    vert_indices.append(vert_nums[0])
-                    j += 1
-
-                    diffs = indices
-
-            for idx in diffs:
-                data['positions'][0]['data'].append(tuple(mesh.GetControlPointAt(idx)))
-                new_vertex_indices[idx].append(j)
-                pos = indices.index(idx)
-                vert_indices.append(vert_nums[pos])
-                j += 1
-
-            last_indices = indices[:]
-            poly_indices.append(vert_indices)
+        for idx in strip_indices:
+            data['positions'][0]['data'].append(mesh.GetControlPointAt(idx))
+            new_vertex_indices[idx].append(j)
+            j += 1
 
         for i in range(mesh.GetLayerCount()):
             layer = mesh.GetLayer(i)
@@ -407,14 +385,31 @@ class FBX:
             uv_ge = mesh.GetElementUV(i)
             normal_ge = mesh.GetElementNormal(i)
 
-            for j in range(len(poly_indices)):
-                if uv_ge:
-                    uvs = [self.get_texture_uv_by_ge(mesh, uv_ge, j, x) for x in poly_indices[j]]
-                    data['uvs'][i]['data'].extend(uvs)
+            if uv_ge:
+                # Keeping one uv per vert
+                verts_uvs = {}
+                for j in range(mesh.GetPolygonCount()):
+                    for k in range(3):
+                        idx = mesh.GetPolygonVertex(j, k)
+                        uv = self.get_texture_uv_by_ge(mesh, uv_ge, j, k)
+                        if idx not in verts_uvs.keys():
+                            verts_uvs[idx] = uv
 
-                if normal_ge:
-                    normals = [normal_ge.GetDirectArray().GetAt(j * 3 + x) for x in poly_indices[j]]
-                    data['normals'][i]['data'].extend(normals)
+                for idx in strip_indices:
+                    data['uvs'][i]['data'].append(verts_uvs[idx])
+
+            if normal_ge:
+                # Keeping one normal per vert
+                verts_normals = {}
+                for j in range(mesh.GetPolygonCount()):
+                    for k in range(3):
+                        idx = mesh.GetPolygonVertex(j, k)
+                        normal = normal_ge.GetDirectArray().GetAt(j * 3 + k)
+                        if idx not in verts_normals.keys():
+                            verts_normals[idx] = normal
+
+                for idx in strip_indices:
+                    data['normals'][i]['data'].append(verts_normals[idx])
 
         # Bone weights
         try:
