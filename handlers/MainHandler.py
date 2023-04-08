@@ -81,17 +81,33 @@ class MainHandler():
         
         # Output files
         self.spr_path = self.view_handler.open_file_dialog('save-file', 
-            'Save the SPR file', 'ZPAK (*.zpak);;PAK (*.pak);;SPR (*.spr);;All files (*.*)')[0]
+            'Save the SPR file', 'SPR (*.spr *.pak *.zpak);;All files (*.*)')[0]
         if not self.spr_path:
             return
 
-        self.ioram_path = self.view_handler.open_file_dialog('save-file', 
-            'Save the IORAM file', 'ZPAK (*.zpak);;PAK (*.pak);;IORAM (*.ioram);;All files (*.*)')[0]
+        self.ioram_path = None
+        self.vram_path = None
+        if self.spr_path :
+            if self.spr_path.endswith("_s.zpak") :
+                self.ioram_path = self.spr_path[:-7] + "_i.zpak"
+                self.vram_path = self.spr_path[:-7] + "_v.zpak"
+            if self.spr_path.endswith("_s.pak"):
+                self.ioram_path = self.spr_path[:-6] + "_i.pak"
+                self.vram_path = self.spr_path[:-6] + "_v.pak"
+            if self.spr_path.endswith(".spr"):
+                self.ioram_path = self.spr_path[:-4] + ".ioram"
+                self.vram_path = self.spr_path[:-4] + ".vram"
+
+				
+        if not self.ioram_path:
+            self.ioram_path = self.view_handler.open_file_dialog('save-file', 
+            'Save the IORAM file', 'IORAM (*.ioram *.pak *.zpak);;All files (*.*)')[0]
         if not self.ioram_path:
             return
         
-        self.vram_path = self.view_handler.open_file_dialog('save-file', 
-            'Save the VRAM file', 'ZPAK (*.zpak);;PAK (*.pak);;VRAM (*.vram);;All files (*.*)')[0]
+        if not self.vram_path:
+            self.vram_path = self.view_handler.open_file_dialog('save-file', 
+            'Save the VRAM file', 'VRAM (*.vram *.pak *.zpak);;All files (*.*)')[0]
         if not self.vram_path:
             return
 
@@ -176,7 +192,26 @@ class MainHandler():
     def open_action(self):
         try:
             spr_path = self.view_handler.open_file_dialog('file', 'Select the SPR file', \
-                'ZPAK (*.zpak);;SPR (*.spr);;PAK (*.pak);;All files (*.*)')[0]
+                'SPR (*.spr *.pak *.zpak);;All files (*.*)')[0]
+            
+            ioram_path = None
+            vram_path = None
+            if spr_path :
+                if spr_path.endswith("_s.zpak"):
+                    ioram_path = spr_path[:-7] + "_i.zpak"
+                    vram_path = spr_path[:-7] + "_v.zpak"
+                if spr_path.endswith("_s.pak"):
+                    ioram_path = spr_path[:-6] + "_i.pak"
+                    vram_path = spr_path[:-6] + "_v.pak"
+                if spr_path.endswith(".spr"):
+                    ioram_path = spr_path[:-4] + ".ioram"
+                    vram_path = spr_path[:-4] + ".vram"
+                
+                if ((ioram_path) and (not os.path.exists(ioram_path))) :
+                    ioram_path = None
+                if ((vram_path) and (not os.path.exists(vram_path))) :
+                    vram_path = None
+                
             if spr_path:
                 self.data['spr_stpk'] = self.get_stpk_file(spr_path)
                 if self.data['spr_stpk'] == None:
@@ -201,9 +236,10 @@ class MainHandler():
                     self.data['spr'] = self.data['spr_stpk'].search_entries([], '.spr')[0]
             else:
                 return
-            
-            ioram_path = self.view_handler.open_file_dialog('file', 'Select the IORAM file', \
-                'ZPAK (*.zpak);;IORAM (*.ioram);;PAK (*.pak);;All files (*.*)')[0]
+
+            if ioram_path == None:
+                ioram_path = self.view_handler.open_file_dialog('file', 'Select the IORAM file', \
+                    'IORAM (*.ioram *.pak *.zpak);;All files (*.*)')[0]
             if ioram_path:
                 self.data['ioram_stpk'] = self.get_stpk_file(ioram_path)
                 if self.data['ioram_stpk'] == None:
@@ -227,8 +263,9 @@ class MainHandler():
             else:
                 raise Exception("No model info found in SPR !")
 
-            vram_path = self.view_handler.open_file_dialog('file', 'Select the VRAM file', \
-                'ZPAK (*.zpak);;VRAM (*.vram);;PAK (*.pak);;All files (*.*)')[0]
+            if vram_path == None:
+                vram_path = self.view_handler.open_file_dialog('file', 'Select the VRAM file', \
+                    'VRAM (*.vram *.pak *.zpak);;All files (*.*)')[0]
             if vram_path:
                 self.data['vram_stpk'] = self.get_stpk_file(vram_path)
                 if self.data['vram_stpk'] == None:
