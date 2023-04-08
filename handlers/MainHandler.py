@@ -9,11 +9,14 @@ from tasks.ExportTask import *
 import core.utils as ut
 import core.common as cm
 import ui.handlers.ViewHandler as vh
+from PyQt5.QtCore import QSettings
+from PyQt5.QtCore import QUrl
 
 class MainHandler():
     def init(self, view_handler = None):
         self.paths = {}
         self.data = {}
+        self.settings = QSettings("settings.ini", QSettings.IniFormat)
 
         if view_handler != None:
             self.view_handler = view_handler
@@ -75,15 +78,22 @@ class MainHandler():
         self.view_handler.close_window()
 
     def select_input_action(self, observed, args):
-        self.fbx_path = self.view_handler.open_file_dialog('file', 'Select the FBX file', 'FBX (*.fbx)')[0]
+
+        last = self.settings.value("LastFbxLoaded")                # on each execution of the tool, we lost the previous path, that a waste of time, so keep it into .ini
+        self.fbx_path = self.view_handler.open_file_dialog('file', 'Select the FBX file', 'FBX (*.fbx)', False, last)[0]
         if not self.fbx_path:
-            return
+            return        
+        self.settings.setValue("LastFbxLoaded", QUrl(self.fbx_path).adjusted(QUrl.RemoveFilename).toString())
+
         
         # Output files
+        last = self.settings.value("LastSprSaved")
         self.spr_path = self.view_handler.open_file_dialog('save-file', 
-            'Save the SPR file', 'SPR (*.spr *.pak *.zpak);;All files (*.*)')[0]
+            'Save the SPR file', 'SPR (*.spr *.pak *.zpak);;All files (*.*)', False, last)[0]
         if not self.spr_path:
             return
+        self.settings.setValue("LastSprSaved", QUrl(self.spr_path).adjusted(QUrl.RemoveFilename).toString())
+
 
         self.ioram_path = None
         self.vram_path = None
@@ -158,9 +168,12 @@ class MainHandler():
             self.open_action()
 
             if ('spr' in self.data.keys()) and ('ioram' in self.data.keys()) and ('vram' in self.data.keys()):
-                self.output_path = self.view_handler.open_file_dialog('folder', 'Select the destination folder')
+                
+                last = self.settings.value("LastExportFolder")
+                self.output_path = self.view_handler.open_file_dialog('folder', 'Select the destination folder', False, last)
                 if not self.output_path:
                     return
+                self.settings.setValue("LastExportFolder", QUrl(self.output_path).adjusted(QUrl.RemoveFilename).toString())
 
                 if len(os.listdir(self.output_path)) > 0:
                     self.view_handler.show_message_dialog(
@@ -191,9 +204,13 @@ class MainHandler():
     
     def open_action(self):
         try:
-            spr_path = self.view_handler.open_file_dialog('file', 'Select the SPR file', \
-                'SPR (*.spr *.pak *.zpak);;All files (*.*)')[0]
             
+            last = self.settings.value("LastSprLoaded")
+            spr_path = self.view_handler.open_file_dialog('file', 'Select the SPR file', \
+                'SPR (*.spr *.pak *.zpak);;All files (*.*)', False, last)[0]            
+            if spr_path :
+                self.settings.setValue("LastSprLoaded", QUrl(spr_path).adjusted(QUrl.RemoveFilename).toString())
+
             ioram_path = None
             vram_path = None
             if spr_path :

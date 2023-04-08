@@ -76,7 +76,7 @@ class ViewHandler():
         if callback != None:
             self.window_handler.set_callback(callback)
     
-    def open_file_dialog(self, type = 'file', title = 'Open', filter = '', multiple = False):
+    def open_file_dialog(self, type = 'file', title = 'Open', filter = '', multiple = False, directory =''):
         if type == 'folder':
             method = "getExistingDirectory"
         elif type == 'save-file':
@@ -86,6 +86,6 @@ class ViewHandler():
         else:
             method = "getOpenFileName"
         if type != 'folder':
-            return eval(f"QFileDialog.{method}")(self.window, title, filter=filter)
+            return eval(f"QFileDialog.{method}")(self.window, title, filter=filter, directory=directory)
         else:
-            return eval(f"QFileDialog.{method}")(self.window, title)
+            return eval(f"QFileDialog.{method}")(self.window, title, directory=directory)
