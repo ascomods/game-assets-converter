@@ -78,8 +78,8 @@ class MainHandler():
         self.view_handler.close_window()
 
     def select_input_action(self, observed, args):
-
-        last = self.settings.value("LastFbxLoaded")                # on each execution of the tool, we lost the previous path, that a waste of time, so keep it into .ini
+		# Saving last loaded FBX file into .ini
+        last = self.settings.value("LastFbxLoaded")
         self.fbx_path = self.view_handler.open_file_dialog('file', 'Select the FBX file', 'FBX (*.fbx)', False, last)[0]
         if not self.fbx_path:
             return        
