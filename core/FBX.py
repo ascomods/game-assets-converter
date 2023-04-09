@@ -123,7 +123,10 @@ class FBX:
         ios = fbx.FbxIOSettings.Create(fbx_manager, fbx.IOSROOT)
         fbx_manager.SetIOSettings(ios)
         fbx_manager.GetIOSettings().SetIntProp(fbx.EXP_FBX_COMPRESS_LEVEL, 9)
-        FbxCommon.SaveScene(fbx_manager, scene, "output.fbx", False)
+        FbxCommon.SaveScene(fbx_manager, scene, "output.fbx", 0, False)
+
+        if(True) :          # Fbx Txt debug 
+            FbxCommon.SaveScene(fbx_manager, scene, "output.fbx.txt", 1)
 
         fbx_manager.Destroy()
         del scene

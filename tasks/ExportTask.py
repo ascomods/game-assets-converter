@@ -86,6 +86,7 @@ class ExportTask(Task):
             
             # Rebuilding shapes to match new mesh names
             new_scne_shape_dict = {}
+            namesLinks = {}
             for scne_shape_name, shape_name in scne_shape_dict.items():
                 for scne_mesh_name, mesh_shape in scne_mesh_dict.items():
                     if mesh_shape == shape_name:
@@ -94,8 +95,23 @@ class ExportTask(Task):
                         new_shape_name += 'Shape'
                         if new_shape_name not in new_scne_shape_dict.keys():
                             new_scne_shape_dict[new_shape_name] = shap_dict[shape_name]
+                            namesLinks[new_shape_name] = shape_name
 
-            json_data = json.dumps(new_scne_shape_dict, indent=4)
+            #Try to keep previous SHAP order            #hard to make the diff
+            tmp_list = {}
+            for name, content in shap_dict.items():
+
+                for new_name, new_content in new_scne_shape_dict.items():
+                    if namesLinks[new_name] == name:
+                        tmp_list[new_name] = new_content
+                        del new_scne_shape_dict[new_name]
+                        break
+
+            for new_name, new_content in new_scne_shape_dict.items():
+                tmp_list[new_name] = new_content
+            new_scne_shape_dict = tmp_list
+
+            json_data = json.dumps(new_scne_shape_dict, indent=4)          
             data_stream = open(f"{self.output_path}\SHAP.json", "w")
             data_stream.write(str(json_data))
 

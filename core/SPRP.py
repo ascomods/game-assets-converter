@@ -445,12 +445,14 @@ class SPRPDataEntry:
                 entry_list.append(self)
             elif (self.data.__class__.__name__ == self.__class__.__name__):
                 entry_list = self.data.search_entries(entry_list, criteria)
-        for child in self.children:
-            if (child.__class__.__name__ == criteria) or (ut.b2s_name(child.name) == criteria):
-                entry_list.append(child)
-            if (child.__class__.__name__ == self.__class__.__name__):
-                entry_list = child.search_entries(entry_list, criteria)
-        
+
+        if criteria != 'SHAP':
+            for child in self.children:
+                if (child.__class__.__name__ == criteria) or (ut.b2s_name(child.name) == criteria):
+                    entry_list.append(child)
+                if (child.__class__.__name__ == self.__class__.__name__):
+                    entry_list = child.search_entries(entry_list, criteria)
+
         return entry_list
 
     def sort(self, reverse = False):

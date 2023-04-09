@@ -429,7 +429,7 @@ class ImportTask(Task):
                         shap_data = None
 
                     if shape_name not in shapes.keys():
-                        shape_object = SHAP('', b'', spr_object.string_table)
+                        shape_object = SHAP('', shap_name, spr_object.string_table)
                         if shap_data:
                             shape_object.load_data(shap_data)
                         spr_data_entry = SPRPDataEntry(b'SHAP', shap_name, spr_object.string_table, True)
@@ -637,6 +637,39 @@ class ImportTask(Task):
                 entry.sort()
                 if len(entry.entries) > 0:
                     spr_object.entries.append(entry)
+
+            #Try to keep previous MTRL order
+            tmp_list = []
+            for name, content in mtrl_dict.items():
+                name = ut.s2b_name(name)
+
+                for entry in spr['MTRL'].entries:
+                    if entry.name == name:
+                        tmp_list.append(entry)
+                        spr['MTRL'].entries.remove(entry)
+                        break
+
+            for entry in spr['MTRL'].entries:
+                tmp_list.append(entry)
+            spr['MTRL'].entries = tmp_list
+
+            #Same for Shape
+            tmp_list = []
+            for name, content in shap_dict.items():
+                name = ut.s2b_name(name)
+
+                for entry in spr['SHAP'].entries:
+                    if entry.name == name:
+                        tmp_list.append(entry)
+                        spr['SHAP'].entries.remove(entry)
+                        break
+
+            for entry in spr['SHAP'].entries:
+                tmp_list.append(entry)
+            spr['SHAP'].entries = tmp_list
+
+
+
 
             # Build ioram
             ioram_data = bytearray()
