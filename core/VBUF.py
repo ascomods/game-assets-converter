@@ -7,7 +7,7 @@ class VBUF:
     info_size = 32
     vertex_decl_size = 20
     vertex_format = {
-        2: 'L',  # VTXFMT_ULONG1
+        2: 'L',  # VTXFMT_UINT1
         8: 'f',  # VTXFMT_FLOAT1
         9: 'ff',  # VTXFMT_FLOAT2
         10: 'fff', # VTXFMT_FLOAT3
