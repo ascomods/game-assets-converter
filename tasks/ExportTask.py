@@ -117,6 +117,8 @@ class ExportTask(Task):
 
             self.send_progress(40)
 
+            #
+
             # MTRL
             mtrl_dict = {}
             for data in mtrl_data:
