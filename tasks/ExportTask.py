@@ -117,8 +117,6 @@ class ExportTask(Task):
 
             self.send_progress(40)
 
-            #
-
             # MTRL
             mtrl_dict = {}
             for data in mtrl_data:
@@ -188,6 +186,17 @@ class ExportTask(Task):
                 data_stream = open(f"{self.output_path}\SCNE.json", "w")
                 data_stream.write(str(json_data))
             
+            # create a json vBuff.json file to get vbuuf in the same order to repack (and make comparaison with fbx txt or binary version of spr)
+            vbuf_list = []
+            for data in vbuf_data:
+                if data.__class__.__name__ == "SPRPDataEntry":
+                    vbuf_list.append(ut.b2s_name(data.name))
+            json_data = json.dumps(vbuf_list, indent=4)
+            data_stream = open(f"{self.output_path}\VBUF.json", "w")
+            data_stream.write(str(json_data))
+            
+
+
             fbx_object = FBX()
             fbx_object.data = {
                 'bone': bone_data,
