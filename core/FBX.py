@@ -640,7 +640,25 @@ class FBX:
 
         #self.createMeshDebugXml("11_MakingTriangleStrip", name.replace(":", "_"), vertices, faces_triangles)
 
+        # Using NviTriStripper to generate the strip indices then build the strip
 
+        flat_tri = sum(faces_triangles, [])
+        tri_indices_text = str(flat_tri).replace(" ", "").replace("[", "").replace("]", "")
+        
+        tri_input = open(f"{cm.temp_path}/triangles.txt", "w")
+        tri_input.write(tri_indices_text)
+        tri_input.flush()
+
+        cmd.nvtri_stripper(f"{cm.temp_path}\\triangles.txt", f"{cm.temp_path}\\triangles_out.txt")
+        tri_output = open(f"{cm.temp_path}\\triangles_out.txt", "r")
+        strip_indices = eval(tri_output.readline().strip())
+
+        new_vertices = []
+
+        for idx in strip_indices:
+            new_vertices.append(vertices[idx])
+
+        vertices = new_vertices[:]
 
         # ------------------------------------------------ 
         # Apply Triangle Strip 
