@@ -958,7 +958,7 @@ class FBX:
 
         # Todo put somewhere as Options
         removeDuplicateVertex = True
-        removeTriangleStrip = False
+        removeTriangleStrip = True
         useFbxFaceOptimisation = False
         
 
@@ -1046,9 +1046,17 @@ class FBX:
         #    mesh.RemoveBadPolygons() detect the bad Triangle, 
         #    so this step is not really necessary, just to have the debug on it
 
-        #if removeTriangleStrip :
-   
-            #self.createMeshDebugXml("02_RemoveStripDegen", mesh.GetName().replace(":", "_"), vertices, faces_triangles)
+        if removeTriangleStrip :
+            newFaces_triangles = []
+            for i in range(len(faces_triangles)):
+                triangle = [ faces_triangles[i][0], faces_triangles[i][1], faces_triangles[i][2] ]
+
+                # in Triangle strip algo, a degenerative strip (for cut the list) is done with 2 same vertex index in triangle.
+                if((triangle[0]!=triangle[1]) and (triangle[0]!=triangle[2]) and (triangle[1]!=triangle[2])):
+                    newFaces_triangles.append( triangle )        #so keep only triangle with 3 differents index.
+            
+            faces_triangles = newFaces_triangles
+            self.createMeshDebugXml("02_RemoveStripDegen", mesh.GetName().replace(":", "_"), vertices, faces_triangles)
         
 
         # ------------------------------------------------
