@@ -37,6 +37,8 @@ class FBX:
         if (axis_system != new_axis_system):
             new_axis_system.ConvertScene(scene)
 
+        #todo teh same for unit
+
         axis_system = scene.GetGlobalSettings().GetAxisSystem()
         
         root_node = scene.GetRootNode()
@@ -119,10 +121,22 @@ class FBX:
 
         (fbx_manager, scene) = FbxCommon.InitializeSdkObjects()
         
-        self.handle_data(fbx_manager, scene, path)
+        axis_system = fbx.FbxAxisSystem(
+            fbx.FbxAxisSystem.eYAxis, 
+            fbx.FbxAxisSystem.eParityOdd, 
+            fbx.FbxAxisSystem.eRightHanded
+        )   # == eOpenGL ==  Yup Xfront Zright.
+        scene.GetGlobalSettings().SetAxisSystem(axis_system)
+        scene.GetGlobalSettings().SetSystemUnit(fbx.FbxSystemUnit(100.0, 1.0)) # 1 unit in spr == 100m in game/blender/3dsmax/others games  => break 3dsmax bones
+        scene.GetGlobalSettings().SetTimeMode = fbx.FbxTime.eFrames60  # 60 Fps (Frames by Second) => not in python
         #fbx_manager.GetIOSettings().SetIntProp(fbx.EXP_FBX_COMPRESS_LEVEL, 9)  #Todo uncomment
 
-        #Todo miss axis orientation, unit and Framefrequency
+
+        self.handle_data(fbx_manager, scene, path)
+        
+        #root_node = scene.GetRootNode()        #Test Todo remove
+        #root_node.LclScaling.Set(fbx.FbxDouble3(100.0, 100.0, 100.0)) # 1 unit in spr == 100m in game/blender/3dsmax/others games 
+
 
         FbxCommon.SaveScene(fbx_manager, scene, "output.fbx", 0, False)
 
@@ -136,6 +150,14 @@ class FBX:
         os.chdir('..')
 
         return
+
+
+
+
+
+
+
+
 
     def handle_data(self, manager, scene, path):
         remaining = []
@@ -292,6 +314,10 @@ class FBX:
         for node in nodes:
             if not node.GetParent().Show.Get():
                 node.Show.Set(False)
+
+
+
+
 
     def get_children(self, node, node_list, class_names = []):
         if node.GetNodeAttribute():
