@@ -632,16 +632,16 @@ class FBX:
 
         # Todo may be add a part to optimize the vertex and face before making triangle strip (depend of optimisation of 3dsmax/blender)
 
+
+
+
+
+
         # ------------------------------------------------ 
         # Transform Triangle list -> Triangle Strip 
         # ------------------------------------------------ 
-        #Todo redo NvTriStrip
-
-
-        #self.createMeshDebugXml("11_MakingTriangleStrip", name.replace(":", "_"), vertices, faces_triangles)
 
         # Using NviTriStripper to generate the strip indices then build the strip
-
         flat_tri = sum(faces_triangles, [])
         tri_indices_text = str(flat_tri).replace(" ", "").replace("[", "").replace("]", "")
         
@@ -653,20 +653,44 @@ class FBX:
         tri_output = open(f"{cm.temp_path}\\triangles_out.txt", "r")
         strip_indices = eval(tri_output.readline().strip())
 
-        new_vertices = []
+        
+        newFaces_triangles = []
+        nbStripsIndices = len(strip_indices)
+        for i in range(0, nbStripsIndices, 3):
+            newFaces_triangles.append( [ strip_indices[i], strip_indices[ ((i + 1) if(i+1<nbStripsIndices) else (nbStripsIndices-1)) ], strip_indices[ ((i + 2) if(i+2<nbStripsIndices) else (nbStripsIndices-1)) ] ] )
 
-        for idx in strip_indices:
-            new_vertices.append(vertices[idx])
+        faces_triangles = newFaces_triangles
+        self.createMeshDebugXml("11_MakingTriangleStrip", name.replace(":", "_"), vertices, faces_triangles)
 
-        vertices = new_vertices[:]
+
+
+
+
+
+
+
+
+
 
         # ------------------------------------------------ 
-        # Apply Triangle Strip 
+        # Apply Triangle Strip  on Vertex (Game's logic  / bad logic : they don't have faceIndex, but duplicate Vertex)
         # ------------------------------------------------ 
         
-        #Todo duplicate Vertex for Triangle Strip
+        new_vertices = []
+        for i in range(len(strip_indices)):
+            new_vertices.append(vertices[ strip_indices[i] ])
+        
 
-        #self.createMeshDebugXml("10_TriangleStripOnVertex", name.replace(":", "_"), vertices, faces_triangles)
+        newFaces_triangles = []
+        for i in range(len(new_vertices) - 2):               # triangle strips logic
+            if (i % 2 == 0):
+                newFaces_triangles.append( [i, i+1, i+2] )
+            else:
+                newFaces_triangles.append( [i, i+2, i+1] )
+        
+        vertices = new_vertices
+        faces_triangles = newFaces_triangles
+        self.createMeshDebugXml("12_TriangleStripOnVertex", name.replace(":", "_"), vertices, faces_triangles)
 
 
 
