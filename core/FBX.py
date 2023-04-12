@@ -32,7 +32,7 @@ class FBX:
             fbx.FbxAxisSystem.eYAxis, 
             fbx.FbxAxisSystem.eParityOdd, 
             fbx.FbxAxisSystem.eRightHanded
-        )
+        )   # == Yup Xfront Zright ?
 
         if (axis_system != new_axis_system):
             new_axis_system.ConvertScene(scene)
@@ -121,6 +121,8 @@ class FBX:
         
         self.handle_data(fbx_manager, scene, path)
         #fbx_manager.GetIOSettings().SetIntProp(fbx.EXP_FBX_COMPRESS_LEVEL, 9)  #Todo uncomment
+
+        #Todo miss axis orientation, unit and Framefrequency
 
         FbxCommon.SaveScene(fbx_manager, scene, "output.fbx", 0, False)
 
@@ -352,8 +354,10 @@ class FBX:
 
         data = {
             'positions': [],
+            'colors': [],
             'normals': [],
             'binormals': [],
+            'tangents': [],
             'uvs': [],
             'bone_weights': [],
             'bone_indices': [],
@@ -634,7 +638,59 @@ class FBX:
 
 
 
+        # ------------------------------------------------ 
+        # Complet Normal Binormal Tangent
+        # Notice: Normal Binormal Tangent are used for NormalMapping (rgb = xyz in the TNB repere)
+        #         Same if sound the Rb2 game create the tangents in shaders from normal and binormals,
+        #         others game like xenoverse prefer to make Binormal from Normal and Tangent.
+        #         so if you get mesh for others game, or create one with export only 2 of them
+        #         you need to build the third.
+        # ------------------------------------------------ 
+        completeBinormalTangent = True
+        nbVertex = len(vertices)
+        if ((completeBinormalTangent) and (nbVertex)):
+            
+            # Yup, Xfront, Zright (Right Handed)
+            axisXYZ = [{"name": "tangent", "nb": 0}, {"name": "normal", "nb": 0}, {"name": "binormal", "nb": 0}]
 
+            isModified = False
+            minCommonLayers = -1
+            for i in range(3):
+                axisXYZ[i]["nb"] = len(vertices[0][ axisXYZ[i]["name"] ]) if(vertices[0][ axisXYZ[i]["name"] ]) else 0
+                minCommonLayers = axisXYZ[i]["nb"] if((axisXYZ[i]["nb"]) and ( (minCommonLayers<0) or (axisXYZ[i]["nb"]>minCommonLayers))) else minCommonLayers
+
+            if (minCommonLayers>=1) :
+                axisToFills = []
+                for i in range(1, minCommonLayers + 1):
+                    if  ((axisXYZ[0]["nb"]<i) and (axisXYZ[1]["nb"]>=i) and (axisXYZ[2]["nb"]>=i)):   #If only miss tangents, add it
+                        axisToFills.append( 0 )
+                    elif((axisXYZ[0]["nb"]>=i) and (axisXYZ[1]["nb"]>=i) and (axisXYZ[2]["nb"]<i)):   #If only miss binormals, add it
+                        axisToFills.append( 2 )
+                    elif((axisXYZ[0]["nb"]>=i) and (axisXYZ[1]["nb"]<i) and (axisXYZ[2]["nb"]>=i)):   #If only miss normals (should be a never case), add it
+                        axisToFills.append( 1 )
+                    else:
+                        axisToFills.append( -1 )
+                
+                for i in range(minCommonLayers):
+                    axisToFill = axisToFills[i]
+                    if(axisToFill==-1):
+                        continue
+                    
+                    isModified = True
+                    
+                    srcAxis = []
+                    for j in range(2):
+                        srcAxis.append((axisToFill + j + 1) % 3)             # Ex: for Tangent, you need Normal + Binormal in this order. and for binormal, you need tangent and normal in this order
+                    
+                    for j in range(nbVertex):
+                        vertex = vertices[j]
+                        vertex[ axisXYZ[ axisToFill ]["name"] ].append( ut.crossProd_Vect4( vertex[ axisXYZ[ srcAxis[0] ]["name"] ][i], vertex[ axisXYZ[ srcAxis[1] ]["name"] ][i] ) )
+
+            if isModified :
+                self.createMeshDebugXml("11_CompleteBinormalTangent", name.replace(":", "_"), vertices, faces_triangles)
+        
+        
+        
 
 
         # ------------------------------------------------ 
@@ -660,7 +716,7 @@ class FBX:
             newFaces_triangles.append( [ strip_indices[i], strip_indices[ ((i + 1) if(i+1<nbStripsIndices) else (nbStripsIndices-1)) ], strip_indices[ ((i + 2) if(i+2<nbStripsIndices) else (nbStripsIndices-1)) ] ] )
 
         faces_triangles = newFaces_triangles
-        self.createMeshDebugXml("11_MakingTriangleStrip", name.replace(":", "_"), vertices, faces_triangles)
+        self.createMeshDebugXml("12_MakingTriangleStrip", name.replace(":", "_"), vertices, faces_triangles)
 
 
 
@@ -690,7 +746,7 @@ class FBX:
         
         vertices = new_vertices
         faces_triangles = newFaces_triangles
-        self.createMeshDebugXml("12_TriangleStripOnVertex", name.replace(":", "_"), vertices, faces_triangles)
+        self.createMeshDebugXml("13_TriangleStripOnVertex", name.replace(":", "_"), vertices, faces_triangles)
 
 
 
@@ -708,16 +764,22 @@ class FBX:
             #Todo case no Vertex
 
             nbVertex = len(vertices)
+            nbColorLy = len(vertices[0]["color"]) if(vertices[0]["color"]) else 0
             nbNormalLy = len(vertices[0]["normal"]) if(vertices[0]["normal"]) else 0
             nbBinormalLy = len(vertices[0]["binormal"]) if(vertices[0]["binormal"]) else 0
+            nbTangentLy = len(vertices[0]["tangent"]) if(vertices[0]["tangent"]) else 0
             nbUvLy = len(vertices[0]["uv"]) if(vertices[0]["uv"]) else 0
             nbBoneLayer = len(vertices[0]["blendIndices"]) if(vertices[0]["blendIndices"]) else 0
 
             data['positions'] = [{'data': []}]
+            for i in range(nbColorLy):
+                data['colors'].append({'data': []})
             for i in range(nbNormalLy):
                 data['normals'].append({'data': []})
             for i in range(nbBinormalLy):
                 data['binormals'].append({'data': []})
+            for i in range(nbTangentLy):
+                data['tangents'].append({'data': []})
             for i in range(nbUvLy):
                 data['uvs'].append({'resource_name': ("map"+ str(i +1 )), 'data': []})  #Todo Check if it's always "mapX"
             for i in range(nbBoneLayer):
@@ -728,10 +790,14 @@ class FBX:
                 vertex = vertices[i]
                 
                 data['positions'][0]['data'].append([vertex["position"]["x"], vertex["position"]["y"], vertex["position"]["z"], vertex["position"]["w"] ])
+                for j in range(nbColorLy):
+                    data['colors'][j]['data'].append([vertex["color"][j]["r"], vertex["color"][j]["g"], vertex["color"][j]["b"], vertex["color"][j]["a"] ])
                 for j in range(nbNormalLy):
                     data['normals'][j]['data'].append([vertex["normal"][j]["x"], vertex["normal"][j]["y"], vertex["normal"][j]["z"], vertex["normal"][j]["w"] ])
                 for j in range(nbBinormalLy):
                     data['binormals'][j]['data'].append([vertex["binormal"][j]["x"], vertex["binormal"][j]["y"], vertex["binormal"][j]["z"], vertex["binormal"][j]["w"] ])
+                for j in range(nbTangentLy):
+                    data['tangents'][j]['data'].append([vertex["tangent"][j]["x"], vertex["tangent"][j]["y"], vertex["tangent"][j]["z"], vertex["tangent"][j]["w"] ])
                 for j in range(nbUvLy):
                     data['uvs'][j]['data'].append( [vertex["uv"][j]["u"], vertex["uv"][j]["v"] ])
                 for j in range(nbBoneLayer):
@@ -1114,8 +1180,10 @@ class FBX:
             nbVertex = len(vertices)
             mesh.InitControlPoints(nbVertex)
 
+            fbx_colors = []
             fbx_normals = []
             fbx_binormals = []
+            fbx_tangents = []
             fbx_uvs = []
 
             skin = None
@@ -1134,7 +1202,26 @@ class FBX:
                 v = fbx.FbxVector4(vertex["position"]["x"], vertex["position"]["y"], vertex["position"]["z"], vertex["position"]["w"])
                 mesh.SetControlPointAt(v, i)
 
-                # Todo VertexColor
+                # Color                 # Todo a test
+                for j in range(len(vertex["color"])):
+                    color = vertex["color"][j]
+
+                    if (j>=len(fbx_colors)):
+                        paramName = "color_"+ (("_"+ str(j)) if (j!=0) else "") 
+                        fbx_color = fbx.FbxLayerElementVertexColor.Create(mesh, paramName)
+                        fbx_color.SetMappingMode(fbx.FbxLayerElement.eByControlPoint)
+                        fbx_color.SetReferenceMode(fbx.FbxLayerElement.eDirect)
+                        fbx_colors.append(fbx_color)
+
+                        layer = mesh.GetLayer(j)
+                        if (not layer):
+                            mesh.CreateLayer()
+                            layer = mesh.GetLayer(j)
+                        layer.SetColors(fbx_color)
+                    
+                    fbx_color = fbx_colors[j]
+                    fbx_color.GetDirectArray().Add(fbx.FbxVector4(color["r"], color["g"], color["b"], color["a"]))
+
 
                 # Normal
                 for j in range(len(vertex["normal"])):
@@ -1175,8 +1262,28 @@ class FBX:
                     
                     fbx_binormal = fbx_binormals[j]
                     fbx_binormal.GetDirectArray().Add(fbx.FbxVector4(binormal["x"], binormal["y"], binormal["z"], binormal["w"]))
+                
 
-                # Todo Tangent
+                # Tangent
+                for j in range(len(vertex["tangent"])):
+                    tangent = vertex["tangent"][j]
+
+                    if (j>=len(fbx_tangents)):
+                        paramName = "tangent_"+ (("_"+ str(j)) if (j!=0) else "") 
+                        fbx_tangent = fbx.FbxLayerElementTangent.Create(mesh, paramName)
+                        fbx_tangent.SetMappingMode(fbx.FbxLayerElement.eByControlPoint)
+                        fbx_tangent.SetReferenceMode(fbx.FbxLayerElement.eDirect)
+                        fbx_tangents.append(fbx_tangent)
+
+                        layer = mesh.GetLayer(j)
+                        if (not layer):
+                            mesh.CreateLayer()
+                            layer = mesh.GetLayer(j)
+                        layer.SetTangents(fbx_tangent)
+                    
+                    fbx_tangent = fbx_tangents[j]
+                    fbx_tangent.GetDirectArray().Add(fbx.FbxVector4(tangent["x"], tangent["y"], tangent["z"], tangent["w"]))
+
 
                 # Uv
                 for j in range(len(vertex["uv"])):

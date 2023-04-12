@@ -137,3 +137,16 @@ def on_rm_error(func, path, exc_info):
 
 def print_hex(data):
     print(''.join(r' '+hex(letter)[2:] for letter in data))
+
+
+
+
+def crossProd_Vect3(vectA, vectB):
+    return {"x": (vectA["y"] * vectB["z"] - vectA["z"] * vectB["y"]), \
+            "y": (vectA["z"] * vectB["x"] - vectA["x"] * vectB["z"]), \
+            "z": (vectA["x"] * vectB["y"] - vectA["y"] * vectB["x"]) }
+
+def crossProd_Vect4(vectA, vectB):
+    ret = crossProd_Vect3(vectA, vectB)
+    ret["w"] = 1.0
+    return ret
