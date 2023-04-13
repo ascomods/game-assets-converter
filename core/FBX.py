@@ -120,23 +120,29 @@ class FBX:
         os.chdir(path)
 
         (fbx_manager, scene) = FbxCommon.InitializeSdkObjects()
-        
+
+        # with radits, we know : the game +Y up, +X right, +Z from 
+        # => it's a leftHanded 
+        # but blender don't give the good result.
+        # Solution : apply a scale.x = -1.0 on NULL in blender before edit.
         axis_system = fbx.FbxAxisSystem(
             fbx.FbxAxisSystem.eYAxis, 
             fbx.FbxAxisSystem.eParityOdd, 
             fbx.FbxAxisSystem.eRightHanded
-        )   # == eOpenGL ==  Yup Xfront Zright.
+        )   
         scene.GetGlobalSettings().SetAxisSystem(axis_system)
-        scene.GetGlobalSettings().SetSystemUnit(fbx.FbxSystemUnit(100.0, 1.0)) # 1 unit in spr == 100m in game/blender/3dsmax/others games  => break 3dsmax bones
+        #scene.GetGlobalSettings().SetSystemUnit(fbx.FbxSystemUnit(100.0, 1.0)) # 1 unit in spr == 100m in game/blender/3dsmax/others games
+        scene.GetGlobalSettings().SetSystemUnit(fbx.FbxSystemUnit.m)
         scene.GetGlobalSettings().SetTimeMode = fbx.FbxTime.eFrames60  # 60 Fps (Frames by Second) => not in python
         #fbx_manager.GetIOSettings().SetIntProp(fbx.EXP_FBX_COMPRESS_LEVEL, 9)  #Todo uncomment
 
 
         self.handle_data(fbx_manager, scene, path)
         
-        #root_node = scene.GetRootNode()        #Test Todo remove
-        #root_node.LclScaling.Set(fbx.FbxDouble3(100.0, 100.0, 100.0)) # 1 unit in spr == 100m in game/blender/3dsmax/others games 
-
+        # root_node = scene.GetRootNode()        #Test Todo remove
+        # for i in range(root_node.GetChildCount()):
+        #     node_tmp = root_node.GetChild(i)
+        #     node_tmp.LclScaling.Set(fbx.FbxDouble3(-1, 1, 1))
 
         FbxCommon.SaveScene(fbx_manager, scene, "output.fbx", 0, False)
 
@@ -1192,6 +1198,15 @@ class FBX:
             faces_triangles = newFaces_triangles
             self.createMeshDebugXml("02_RemoveStripDegen", mesh.GetName().replace(":", "_"), vertices, faces_triangles)
         
+
+        # Test Todo remove
+        #nbVertex = len(vertices)
+        #for i in range(nbVertex):
+        #    vertex = vertices[i]
+        #    if(vertex["position"]["x"]<0):          #Test get only X positive => direction of Xaxis
+        #        vertex["position"]["x"] = 0
+        #    if(vertex["position"]["z"]<0):          #Test get only Z positive => direction of Zaxis
+        #        vertex["position"]["z"] = 0
 
         # ------------------------------------------------
         # Fbx Construction

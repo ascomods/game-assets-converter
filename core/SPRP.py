@@ -259,6 +259,7 @@ class SPRPDataEntry:
     def __init__(self, data_type, name, string_table, is_main_type = False):
         self.type = data_type
         self.name = name
+        self.realName = None
         self.string_table = string_table
         self.is_main_type = is_main_type
         self.children = []
