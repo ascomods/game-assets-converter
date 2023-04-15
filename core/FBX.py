@@ -2012,6 +2012,20 @@ class FBX:
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
     def createMeshDebugXml(self, folderName = "debugMesh", name = "", vertices = [], faces_triangles = []):   
         #Hyp : all vertices have the same nbLayers for each normals, uv, etc .. (bone blend indices and weight are fill by 0 ,0.0 to complete)
 

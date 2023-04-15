@@ -252,6 +252,7 @@ class ExportTask(Task):
                         datasXml += createBoneNodeXml_recur_Matrix("RelativeTransform", node_tmp.rel_transform)
                     if(matrixToDisplay["transform1"]):
                         t = node_tmp.transform1
+                        t2 = node_tmp.transform2
                         minV3 = [t[0][0], t[1][0], t[2][0]]
                         maxV3 = [t[3][0], t[0][1], t[1][1]]
                         matrix3x3 = [[t[2][1], t[3][1], t[0][2]], [t[1][2], t[2][2], t[3][2]], [t[0][3], t[1][3], t[2][3]] ]
@@ -280,8 +281,8 @@ class ExportTask(Task):
             
                             
                             #simple Cube, center on bottom center  Todo Remove
-                            minV3 = [-0.5, -0.5, -0.5]
-                            maxV3 = [0.5, 0.5, 0.5]
+                            #minV3 = [-0.5, -0.5, -0.5]
+                            #maxV3 = [0.5, 0.5, 0.5]
 
 
                             vertices = debugMesh["vertices"]
@@ -319,7 +320,7 @@ class ExportTask(Task):
                             for i in range(4):
                                 bone_invTf_Matrix4x4.append( [ t[0][i], t[1][i], t[2][i], t[3][i] ] )
 
-                            node_pos = ut.getPositionFromMat4(bone_AbsTf_Matrix4x4)
+                            #node_pos = ut.getPositionFromMat4(bone_AbsTf_Matrix4x4)
 
                             for i in range(len(cubeVertex)):
                                 v = cubeVertex[i]
@@ -356,7 +357,13 @@ class ExportTask(Task):
                         
                         
                         if(scale!=0):
-                            createBoneNodeXml_recur_CreateRotatedCube(minV3, maxV3, matrix3x3, scale, node_tmp, "_T1")
+                            #createBoneNodeXml_recur_CreateRotatedCube(minV3, maxV3, matrix3x3, scale, node_tmp, "_T1")
+                            
+                            # hyp the last float of T1 (witch look like a scale) should be with the two others values, the ones in T2
+                            minV3 = [-t[3][3]/2.0, -t2[0][0]/2.0, -t2[1][0]/2.0]
+                            maxV3 = [t[3][3]/2.0, t2[0][0]/2.0, t2[1][0]/2.0]
+                            
+                            createBoneNodeXml_recur_CreateRotatedCube(minV3, maxV3, matrix3x3, 1.0, node_tmp, "_T1")
 
 
                             

@@ -85,13 +85,25 @@ class MainHandler():
             return        
         self.settings.setValue("LastFbxLoaded", QUrl(self.fbx_path).adjusted(QUrl.RemoveFilename).toString())
 
+        useSameNameForSprAndFolder = self.settings.value("UseSameNameForSprAndFolder")
+        if(useSameNameForSprAndFolder == None):
+            useSameNameForSprAndFolder = False
+            self.settings.setValue("UseSameNameForSprAndFolder", useSameNameForSprAndFolder)
+        useSameNameForSprAndFolder = (useSameNameForSprAndFolder == 'true')
+        preferedFormat = self.settings.value("preferedFormat")
+        if(preferedFormat == None):
+            preferedFormat = "spr"
+            self.settings.setValue("preferedFormat", preferedFormat)
         
         # Output files
-        last = self.settings.value("LastSprSaved")
-        self.spr_path = self.view_handler.open_file_dialog('save-file', 
-            'Save the SPR file', 'SPR (*.spr *.pak *.zpak);;All files (*.*)', False, last)[0]
-        if not self.spr_path:
-            return
+        if(useSameNameForSprAndFolder):
+            self.spr_path = QUrl(self.fbx_path).adjusted(QUrl.RemoveFilename).toString()[0:-1] +"."+ preferedFormat
+        else:
+            last = self.settings.value("LastSprSaved")
+            self.spr_path = self.view_handler.open_file_dialog('save-file', 
+                'Save the SPR file', 'SPR (*.spr *.pak *.zpak);;All files (*.*)', False, last)[0]
+            if not self.spr_path:
+                return
         self.settings.setValue("LastSprSaved", QUrl(self.spr_path).adjusted(QUrl.RemoveFilename).toString())
 
 
@@ -165,20 +177,42 @@ class MainHandler():
     def export_action(self, observed, args):
         try:
             ut.empty_temp_dir()
-            self.open_action()
+            spr_path = self.open_action()
 
             if ('spr' in self.data.keys()) and ('ioram' in self.data.keys()) and ('vram' in self.data.keys()):
                 
-                last = self.settings.value("LastExportFolder")
-                self.output_path = self.view_handler.open_file_dialog('folder', 'Select the destination folder', False, last)
-                if not self.output_path:
-                    return
+                useSameNameForSprAndFolder = self.settings.value("UseSameNameForSprAndFolder")
+                if(useSameNameForSprAndFolder == None):
+                    useSameNameForSprAndFolder = False
+                    self.settings.setValue("UseSameNameForSprAndFolder", useSameNameForSprAndFolder)
+                useSameNameForSprAndFolder = (useSameNameForSprAndFolder == 'true')
+
+                automaticOverideFolder = self.settings.value("AutomaticOverideFolder")
+                if(automaticOverideFolder == None):
+                    automaticOverideFolder = False
+                    self.settings.setValue("AutomaticOverideFolder", automaticOverideFolder)
+                automaticOverideFolder = (automaticOverideFolder == 'true')
+
+
+                if(useSameNameForSprAndFolder):
+                    self.output_path = spr_path.replace(".spr", "").replace(".pak", "").replace(".zpak", "")
+                else:
+                    last = self.settings.value("LastExportFolder")
+                    self.output_path = self.view_handler.open_file_dialog('folder', 'Select the destination folder', False, last)
+                    if not self.output_path:
+                        return
                 self.settings.setValue("LastExportFolder", QUrl(self.output_path).adjusted(QUrl.RemoveFilename).toString())
 
-                if len(os.listdir(self.output_path)) > 0:
+                
+                lastWorkingDir = os.getcwd()
+                if not os.path.exists(self.output_path):
+                    os.mkdir(self.output_path)
+                os.chdir(lastWorkingDir)
+
+
+                if ((len(os.listdir(self.output_path)) > 0) and (not automaticOverideFolder)):
                     self.view_handler.show_message_dialog(
-                        "Folder is not empty, data may be overwritten, Proceed ?", 'question', '', 'ExportTask'
-                    )
+                        "Folder is not empty, data may be overwritten, Proceed ?", 'question', '', 'ExportTask')
                 else:
                     self.view_handler.disable_elements()
                     self.view_handler.load_window('ProgressWindowHandler')
@@ -203,6 +237,7 @@ class MainHandler():
         return stpk_object
     
     def open_action(self):
+        spr_path = None
         try:
             
             last = self.settings.value("LastSprLoaded")
@@ -210,7 +245,7 @@ class MainHandler():
                 'SPR (*.spr *.pak *.zpak);;All files (*.*)', False, last)[0]            
             if spr_path :
                 self.settings.setValue("LastSprLoaded", QUrl(spr_path).adjusted(QUrl.RemoveFilename).toString())
-
+            
             ioram_path = None
             vram_path = None
             if spr_path :
@@ -310,3 +345,5 @@ class MainHandler():
             import traceback
             traceback.print_exc()
             self.view_handler.show_message_dialog("Error while loading files", 'critical')
+            spr_path = None
+        return spr_path
