@@ -27,24 +27,30 @@ class VBUF:
     }
     vertex_usage = {
         0: 'VTXUSAGE_POSITION',
+        1: 'VTXUSAGE_COLOR',
         2: 'VTXUSAGE_NORMAL',
         3: 'VTXUSAGE_BINORMAL',
+        4: 'VTXUSAGE_TANGENT',
         5: 'VTXUSAGE_TEXCOORD',
         6: 'VTXUSAGE_BONE_WEIGHTS',
         7: 'VTXUSAGE_BONE_INDICES'
     }
     vertex_usage_mapping = {
         0: 'positions',
+        1: 'colors',
         2: 'normals',
         3: 'binormals',
+        4: 'tangents',
         5: 'uvs',
         6: 'bone_weights',
         7: 'bone_indices'
     }
     vertex_ordered_keys = [
         'positions',
+        'colors',
         'normals',
         'binormals',
+        'tangents',
         'bone_weights',
         'bone_indices',
         'uvs'

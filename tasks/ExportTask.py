@@ -86,7 +86,7 @@ class ExportTask(Task):
             
             # Rebuilding shapes to match new mesh names
             new_scne_shape_dict = {}
-            namesLinks = {}
+            name_links = {}
             for scne_shape_name, shape_name in scne_shape_dict.items():
                 for scne_mesh_name, mesh_shape in scne_mesh_dict.items():
                     if mesh_shape == shape_name:
@@ -95,14 +95,13 @@ class ExportTask(Task):
                         new_shape_name += 'Shape'
                         if new_shape_name not in new_scne_shape_dict.keys():
                             new_scne_shape_dict[new_shape_name] = shap_dict[shape_name]
-                            namesLinks[new_shape_name] = shape_name
+                            name_links[new_shape_name] = shape_name
 
-            #Try to keep previous SHAP order            #hard to make the diff
+            #Try to keep previous SHAP order
             tmp_list = {}
             for name, content in shap_dict.items():
-
                 for new_name, new_content in new_scne_shape_dict.items():
-                    if namesLinks[new_name] == name:
+                    if name_links[new_name] == name:
                         tmp_list[new_name] = new_content
                         del new_scne_shape_dict[new_name]
                         break

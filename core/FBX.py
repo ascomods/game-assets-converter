@@ -10,8 +10,31 @@ import core.common as cm
 import core.commands as cmd
 from .BMP import BMP
 from .DDS import DDS
+from .XML import XML
 
 class FBX:
+    remove_duplicate_vertex = True
+    remove_triangle_strip = True
+    use_fbx_face_optimisation = False
+    use_per_vertex = True
+    version_from_vertices_list = True
+    debug_mode = False
+
+    colors_components = ['r', 'g', 'b', 'a']
+    others_components = ['x', 'y', 'z', 'w']
+    uvs_components = ['u', 'v']
+
+    params_map = {
+        'positions': 'position',
+        'colors': 'color',
+        'normals': 'normal',
+        'binormals': 'binormal',
+        'tangents': 'tangent',
+        'uvs': 'uv',
+        'bone_indices': 'blend_indices',
+        'bone_weights': 'blend_weights'
+    }
+
     def __init__(self):
         self.data = {}
 
@@ -120,12 +143,9 @@ class FBX:
         (fbx_manager, scene) = FbxCommon.InitializeSdkObjects()
         
         self.handle_data(fbx_manager, scene, path)
-        #fbx_manager.GetIOSettings().SetIntProp(fbx.EXP_FBX_COMPRESS_LEVEL, 9)  #Todo uncomment
-
-        FbxCommon.SaveScene(fbx_manager, scene, "output.fbx", 0, False)
-
-        if(True) :          # Fbx Txt debug 
-            FbxCommon.SaveScene(fbx_manager, scene, "output.fbx.txt", 1)
+        #fbx_manager.GetIOSettings().SetIntProp(fbx.EXP_FBX_COMPRESS_LEVEL, 9)
+        FbxCommon.SaveScene(fbx_manager, scene, "output.fbx", 0)
+        FbxCommon.SaveScene(fbx_manager, scene, "output.fbx.txt", 1)
 
         fbx_manager.Destroy()
         del scene
@@ -206,8 +226,6 @@ class FBX:
                 gt = node.EvaluateGlobalTransform()
                 self.bind_pose.Add(node, fbx.FbxMatrix(gt))
 
-
-        # -------------- 
         scene_entries = self.data['scene'][0].search_entries([], '[NODES]')[0]
         scene_dict = {}
         layered_names = {}
@@ -314,72 +332,50 @@ class FBX:
                 # If node is not in the list, add it
                 node_array += [node]
 
-    def get_texture_uv_by_ge(self, mesh, uv_ge, poly_idx, vert_idx):
-        cp_idx = mesh.GetPolygonVertex(poly_idx, vert_idx)
-        uv_idx = mesh.GetTextureUVIndex(poly_idx, vert_idx)
-        uv = (0.0, 0.0)
+    def retrieve_layers_data(self, layers, default_val = [0, 0, 0, 0]):
+        """Take care about eIndexToDirect or eDirect"""
+        data = []
+        for layer in layers:
+            values = []
 
-        if (uv_ge.GetMappingMode() == fbx.FbxLayerElement.eByControlPoint):
-            if (uv_ge.GetReferenceMode() == fbx.FbxLayerElement.eDirect):
-                uv = tuple(uv_ge.GetDirectArray().GetAt(cp_idx))
-            elif (uv_ge.GetReferenceMode() == fbx.FbxLayerElement.eIndexToDirect):
-                idx = uv_ge.GetIndexArray().GetAt(cp_idx)
-                uv = tuple(uv_ge.GetDirectArray().GetAt(idx))
+            if (layer.GetReferenceMode() == fbx.FbxLayerElement.eIndexToDirect):
+                list_index = layer.GetIndexArray()
+                list_values = layer.GetDirectArray()
+
+                for j in range(list_index.GetCount()):
+                    index = list_index.GetAt(j)
+                    if (index < list_values.GetCount()):
+                        values.append(list_values.GetAt(index))
+                    else:
+                        values.append(default_val)
             else:
-                raise Exception('Unhandled UV reference mode')
-        elif (uv_ge.GetMappingMode() == fbx.FbxLayerElement.eByPolygonVertex):
-            if (uv_ge.GetReferenceMode() in (fbx.FbxLayerElement.eDirect, \
-                                            fbx.FbxLayerElement.eIndexToDirect)):
-                uv = tuple(uv_ge.GetDirectArray().GetAt(uv_idx))
-            else:
-                raise Exception('Unhandled UV reference mode')
-        else:
-            raise Exception('Unhandled UV mapping mode')
-        uv = (uv[0], 1.0 - uv[1])
+                for val in layer.GetDirectArray():
+                    values.append(val)
+            data.append(values)
 
-        return uv
-
-
-
-
-
-    
-
-
+        return data
 
     def get_mesh_data(self, node):
         mesh = node.GetMesh()
 
-        data = {
-            'positions': [],
-            'normals': [],
-            'binormals': [],
-            'uvs': [],
-            'bone_weights': [],
-            'bone_indices': [],
-            'materials': []
-        }
-
-
-
-
         # ------------------------------------------------ 
         # Merge all vertex informations to get just a list of vertex (more easy to deal with)
         # ------------------------------------------------ 
-        #         
-        #todo : do the version with data from PerPolygon (not only from Pervertex)
+        #
+        # TODO: do the version with data from PerPolygon (not only from perVertex)
 
         name = mesh.GetName()
         vertices = []
-        nbVertex = mesh.GetControlPointsCount()
+        nb_vertex = mesh.GetControlPointsCount()
 
-        nbLayers = mesh.GetLayerCount()
+        nb_layers = mesh.GetLayerCount()
         colors_layers = []
         normals_layers = []
         binormals_layers = []
         tangents_layers = []
         uvs_layers = []
-        for i in range(nbLayers):
+
+        for i in range(nb_layers):
             layer = mesh.GetLayer(i)
 
             color = layer.GetVertexColors()
@@ -401,18 +397,11 @@ class FBX:
             uv = layer.GetUVs()
             if uv != None:
                 uvs_layers.append(uv)
-
-        nbColorLy = len(colors_layers)
-        nbNormalLy = len(normals_layers)
-        nbBinormalLy = len(binormals_layers)
-        nbTangentLy = len(tangents_layers)
-        nbUvLy = len(uvs_layers)
         
-
-        nbBoneLayer = 0
-        blend_byVertex = []
-        for i in range(nbVertex):
-            blend_byVertex.append( [] )
+        nb_bone_layer = 0
+        blend_by_vertex = []
+        for i in range(nb_vertex):
+            blend_by_vertex.append([])
 
         skin = mesh.GetDeformer(0)
         if skin:
@@ -426,216 +415,61 @@ class FBX:
                     weights = cluster.GetControlPointWeights()
 
                     for j in range(nbVertexForCluster):
-                        blend_byVertex[vertex_indices[j]].append( {"indexBone": bone_idx, "weight": weights[j] } )
-                        nbTmp = len(blend_byVertex[vertex_indices[j]])
-                        nbBoneLayer = nbTmp if(nbTmp>nbBoneLayer) else nbBoneLayer
+                        blend_by_vertex[vertex_indices[j]].append({"indexBone": bone_idx, "weight": weights[j]})
+                        nb_tmp = len(blend_by_vertex[vertex_indices[j]])
+                        nb_bone_layer = nb_tmp if (nb_tmp > nb_bone_layer) else nb_bone_layer
 
+        # TODO look values (in xeno convertion by v_copy.setColorFromRGBAFloat((float)color.mRed, (float)color.mGreen, (float)color.mBlue, (float)color.mAlpha))
+        layers_dict = {
+            'color': self.retrieve_layers_data(colors_layers, [0, 0, 0, 1.0]),
+            'normal': self.retrieve_layers_data(normals_layers),
+            'binormal': self.retrieve_layers_data(binormals_layers),
+            'tangent': self.retrieve_layers_data(tangents_layers),
+            'uv': self.retrieve_layers_data(uvs_layers)
+        }
 
-                    
-        
-        # Take care about eIndexToDirect or eDirect
-        colors = []
-        for i in range(nbColorLy):
-            colors_Fbx = colors_layers[i]
+        components_map = {'uv': self.uvs_components, 'color': self.colors_components}
 
-            listColors = []
-            if(colors_Fbx.GetReferenceMode()==fbx.FbxLayerElement.eIndexToDirect):
-                listIndex = colors_Fbx.GetIndexArray()
-                listValues = colors_Fbx.GetDirectArray()
+        param_names = ['color', 'normal', 'binormal', 'tangent', 'uv', 'blend_indices', 'blend_weights']
+        for i in range(nb_vertex):
+            vertices.append({})
+            vertices[i] = dict(zip(param_names, [[] for x in range(len(param_names))]))
 
-                nbElements = listIndex.GetCount()
-                defaultVal = [0,0,0,1.0]                    #Todo look values (in xeno convertion by v_copy.setColorFromRGBAFloat((float)color.mRed, (float)color.mGreen, (float)color.mBlue, (float)color.mAlpha);)
+            # w = 1.0 because it's lost after FBX export
+            vertices[i]['position'] = dict(zip(self.others_components, mesh.GetControlPointAt(i)))
+            vertices[i]['position']['w'] = 1.0
 
-                nbValues = listValues.GetCount()
-                for j in range(nbElements):
-                    index = listIndex.GetAt(j)
-                    if (index < nbValues):
-                        listColors.append(listValues.GetAt(index))
-                    else:
-                        listColors.append( defaultVal )
-            else:
-                for val in colors_Fbx.GetDirectArray():
-                    listColors.append(val)
-            colors.append( listColors )
+            for param, layer in layers_dict.items():
+                for layer_data in layer:
+                    components = components_map[param] if (param in components_map) else self.others_components
+                    if (param == 'uv'):
+                        layer_data[i] = (layer_data[i][0], (1.0 - layer_data[i][1]))
+                    vertices[i][param].append(dict(zip(components, layer_data[i])))
 
+            blends = blend_by_vertex[i]
+            # Apparently we have to order by weight (bigger first), and for the same weight, order by index
+            # Cheating by order by index first
+            blends.sort(key=lambda x: x.get('indexBone'))    
+            # Order rewritten by weight (but index's order will be correct for same weight)
+            blends.sort(key=lambda x: x.get('weight'), reverse=True)
 
-        # same for normals
-        normals = []
-        for i in range(nbNormalLy):
-            normals_Fbx = normals_layers[i]
+            vertices[i]['blend_indices'] = []
+            vertices[i]['blend_weights'] = []
 
-            listNormals = []
-            if(normals_Fbx.GetReferenceMode()==fbx.FbxLayerElement.eIndexToDirect):
-                listIndex = normals_Fbx.GetIndexArray()
-                listValues = normals_Fbx.GetDirectArray()
-
-                nbElements = listIndex.GetCount()
-                defaultVal = [0,0,0,0]
-
-                nbValues = listValues.GetCount()
-                for j in range(nbElements):
-                    index = listIndex.GetAt(j)
-                    if (index < nbValues):
-                        listNormals.append(listValues.GetAt(index))
-                    else:
-                        listNormals.append( defaultVal )
-            else:
-                for val in normals_Fbx.GetDirectArray():
-                    listNormals.append(val)
-            normals.append( listNormals )
-
-
-        # same for Binormal
-        binormals = []
-        for i in range(nbBinormalLy):
-            binormals_Fbx = binormals_layers[i]
-
-            listBinormals = []
-            if(binormals_Fbx.GetReferenceMode()==fbx.FbxLayerElement.eIndexToDirect):
-                listIndex = binormals_Fbx.GetIndexArray()
-                listValues = binormals_Fbx.GetDirectArray()
-
-                nbElements = listIndex.GetCount()
-                defaultVal = [0,0,0,0]
-
-                nbValues = listValues.GetCount()
-                for j in range(nbElements):
-                    index = listIndex.GetAt(j)
-                    if (index < nbValues):
-                        listBinormals.append(listValues.GetAt(index))
-                    else:
-                        listBinormals.append( defaultVal )
-            else:
-                for val in binormals_Fbx.GetDirectArray():
-                    listBinormals.append(val)
-            binormals.append( listBinormals )
-
-
-        # same for Tangent
-        tangents = []
-        for i in range(nbTangentLy):
-            tangents_Fbx = tangents_layers[i]
-
-            listTangents = []
-            if(tangents_Fbx.GetReferenceMode()==fbx.FbxLayerElement.eIndexToDirect):
-                listIndex = tangents_Fbx.GetIndexArray()
-                listValues = tangents_Fbx.GetDirectArray()
-
-                nbElements = listIndex.GetCount()
-                defaultVal = [0,0,0,0]
-
-                nbValues = listValues.GetCount()
-                for j in range(nbElements):
-                    index = listIndex.GetAt(j)
-                    if (index < nbValues):
-                        listTangents.append(listValues.GetAt(index))
-                    else:
-                        listTangents.append( defaultVal )
-            else:
-                for val in tangents_Fbx.GetDirectArray():
-                    listTangents.append(val)
-            tangents.append( listTangents )
-
-        # same for UV
-        uvs = []
-        for i in range(nbUvLy):
-            uvs_Fbx = uvs_layers[i]
-
-            listUvs = []
-            if(uvs_Fbx.GetReferenceMode()==fbx.FbxLayerElement.eIndexToDirect):
-                listIndex = uvs_Fbx.GetIndexArray()
-                listValues = uvs_Fbx.GetDirectArray()
-
-                nbElements = listIndex.GetCount()
-                defaultVal = [0,0,0,0]
-
-                nbValues = listValues.GetCount()
-                for j in range(nbElements):
-                    index = listIndex.GetAt(j)
-                    if (index < nbValues):
-                        listUvs.append(listValues.GetAt(index))
-                    else:
-                        listUvs.append( defaultVal )
-            else:
-                for val in uvs_Fbx.GetDirectArray():
-                    listUvs.append(val)
-            uvs.append( listUvs )
-
-        
-
-        for i in range(nbVertex):
-            vertices.append( {} )
-            vertices[i]["color"] = []
-            vertices[i]["normal"] = []
-            vertices[i]["binormal"] = []
-            vertices[i]["tangent"] = []
-            vertices[i]["uv"] = []
-            vertices[i]["blendIndices"] = []
-            vertices[i]["blendWeights"] = []
-
-            vect4_tmp = mesh.GetControlPointAt(i)
-            vertices[i]["position"] = {'x': vect4_tmp[0], 'y': vect4_tmp[1], 'z': vect4_tmp[2], 'w': 1.0}   # vect4_tmp.w = 1.0 because it's lost in FBX
-            
-            if nbColorLy :
-                for j in range(len(colors)):
-                    vect4_tmp = colors[j][i]
-                    paramName = "color"+ (("_"+ str(j)) if (j!=0) else "") 
-                    vertices[i]["color"].append( {'r': vect4_tmp[0], 'g': vect4_tmp[1], 'b': vect4_tmp[2], 'a': vect4_tmp[3]} )
-                    
-            if nbNormalLy :
-                for j in range(len(normals)):
-                    vect4_tmp = normals[j][i]
-                    paramName = "normal"+ (("_"+ str(j)) if (j!=0) else "") 
-                    vertices[i]["normal"].append( {'x': vect4_tmp[0], 'y': vect4_tmp[1], 'z': vect4_tmp[2], 'w': vect4_tmp[3]} )
-                    
-            if nbBinormalLy :
-                for j in range(len(binormals)):
-                    vect4_tmp = binormals[j][i]
-                    paramName = "binormal"+ (("_"+ str(j)) if (j!=0) else "") 
-                    vertices[i]["binormal"].append( {'x': vect4_tmp[0], 'y': vect4_tmp[1], 'z': vect4_tmp[2], 'w': vect4_tmp[3]})
-                    
-            if nbTangentLy :
-                for j in range(len(tangents)):
-                    vect4_tmp = tangents[j][i]
-                    paramName = "tangent"+ (("_"+ str(j)) if (j!=0) else "") 
-                    vertices[i]["tangent"].append( {'x': vect4_tmp[0], 'y': vect4_tmp[1], 'z': vect4_tmp[2], 'w': vect4_tmp[3]})
-
-            if nbUvLy:
-                for j in range(len(uvs)):
-                    vect4_tmp = uvs[j][i]
-                    paramName = "uv"+ (("_"+ str(j)) if (j!=0) else "") 
-                    vertices[i]["uv"].append( {'u': vect4_tmp[0], 'v': (1.0 - vect4_tmp[1]) } )
-
-            if nbBoneLayer:
-                blends = blend_byVertex[i]
-
-                #apparently we have to order by weight (bigger first), and for the same weight, order by index
-                blends.sort(key=lambda x: x.get('indexBone'))               #cheating by order by index first
-                blends.sort(key=lambda x: x.get('weight'), reverse=True)    #rewritted by order by weight (but index's order will be correct for same weight)
-
-                vertices[i]["blendIndices"] = []
-                vertices[i]["blendWeights"] = []
-
-                for j in range(nbBoneLayer):                    #fill if not defined to always have nbBoneLayer values
-                    blend = blends[j] if(j<nbBoneLayer) else {"indexBone": 0, "weight": 0.0}
-                    vertices[i]["blendIndices"].append( blend["indexBone"] )
-                    vertices[i]["blendWeights"].append( blend["weight"] )
+            # Fill if not defined to always have nb_bone_layer values
+            for j in range(nb_bone_layer):
+                blend = blends[j] if (j < nb_bone_layer) else {'indexBone': 0, 'weight': 0.0}
+                vertices[i]['blend_indices'].append(blend['indexBone'])
+                vertices[i]['blend_weights'].append(blend['weight'])
 
         faces_triangles = []
         for i in range(mesh.GetPolygonCount()):
-            faces_triangles.append( [mesh.GetPolygonVertex(i, 0), mesh.GetPolygonVertex(i, 1), mesh.GetPolygonVertex(i, 2)] )
+            faces_triangles.append( [mesh.GetPolygonVertex(i, 0), mesh.GetPolygonVertex(i, 1), mesh.GetPolygonVertex(i, 2)])
 
+        if self.debug_mode:
+            self.create_mesh_debug_xml("10_ImportedFromFbx", name.replace(":", "_"), vertices, faces_triangles)
 
-        self.createMeshDebugXml("10_ImportedFromFbx", name.replace(":", "_"), vertices, faces_triangles)
-
-
-
-        # Todo may be add a part to optimize the vertex and face before making triangle strip (depend of optimisation of 3dsmax/blender)
-
-
-
-
-
+        # TODO maybe add a part to optimize the vertex and face before making triangle strip (depend of optimisation of 3dsmax / blender)
 
         # ------------------------------------------------ 
         # Transform Triangle list -> Triangle Strip 
@@ -644,7 +478,7 @@ class FBX:
         # Using NviTriStripper to generate the strip indices then build the strip
         flat_tri = sum(faces_triangles, [])
         tri_indices_text = str(flat_tri).replace(" ", "").replace("[", "").replace("]", "")
-        
+
         tri_input = open(f"{cm.temp_path}/triangles.txt", "w")
         tri_input.write(tri_indices_text)
         tri_input.flush()
@@ -653,90 +487,70 @@ class FBX:
         tri_output = open(f"{cm.temp_path}\\triangles_out.txt", "r")
         strip_indices = eval(tri_output.readline().strip())
 
-        
-        newFaces_triangles = []
-        nbStripsIndices = len(strip_indices)
-        for i in range(0, nbStripsIndices, 3):
-            newFaces_triangles.append( [ strip_indices[i], strip_indices[ ((i + 1) if(i+1<nbStripsIndices) else (nbStripsIndices-1)) ], strip_indices[ ((i + 2) if(i+2<nbStripsIndices) else (nbStripsIndices-1)) ] ] )
+        new_faces_triangles = []
+        for i in range(0, len(strip_indices), 3):
+            new_faces_triangles.append(
+                [strip_indices[i],
+                 strip_indices[((i + 1) if (i + 1 < len(strip_indices)) else (len(strip_indices) - 1))],
+                 strip_indices[((i + 2) if (i + 2 < len(strip_indices)) else (len(strip_indices) - 1))]]
+            )
 
-        faces_triangles = newFaces_triangles
-        self.createMeshDebugXml("11_MakingTriangleStrip", name.replace(":", "_"), vertices, faces_triangles)
+        faces_triangles = new_faces_triangles
+        if self.debug_mode:
+            self.create_mesh_debug_xml("11_MakingTriangleStrip", name.replace(":", "_"), vertices, faces_triangles)
 
-
-
-
-
-
-
-
-
-
-
-        # ------------------------------------------------ 
+        # -------------------------------------------------------------------------------------------------------------
         # Apply Triangle Strip  on Vertex (Game's logic  / bad logic : they don't have faceIndex, but duplicate Vertex)
-        # ------------------------------------------------ 
-        
+        # -------------------------------------------------------------------------------------------------------------
+
         new_vertices = []
         for i in range(len(strip_indices)):
-            new_vertices.append(vertices[ strip_indices[i] ])
-        
+            new_vertices.append(vertices[strip_indices[i]])
 
-        newFaces_triangles = []
-        for i in range(len(new_vertices) - 2):               # triangle strips logic
+        new_faces_triangles = []
+        for i in range(len(new_vertices) - 2):
+            # Triangle strips logic
             if (i % 2 == 0):
-                newFaces_triangles.append( [i, i+1, i+2] )
+                new_faces_triangles.append([i, i + 1, i + 2])
             else:
-                newFaces_triangles.append( [i, i+2, i+1] )
+                new_faces_triangles.append([i, i + 2, i + 1])
         
         vertices = new_vertices
-        faces_triangles = newFaces_triangles
-        self.createMeshDebugXml("12_TriangleStripOnVertex", name.replace(":", "_"), vertices, faces_triangles)
-
-
-
-
-
+        faces_triangles = new_faces_triangles
+        if self.debug_mode:
+            self.create_mesh_debug_xml("12_TriangleStripOnVertex", name.replace(":", "_"), vertices, faces_triangles)
 
         # ------------------------------------------------ 
-        # Fill internal data for making spr
+        # Fill internal data for building spr
         # ------------------------------------------------ 
 
+        if self.version_from_vertices_list:
 
-        versionFromVerticeList = True
-        if versionFromVerticeList:
-            
-            #Todo case no Vertex
+            # TODO case no Vertex
 
-            nbVertex = len(vertices)
-            nbNormalLy = len(vertices[0]["normal"]) if(vertices[0]["normal"]) else 0
-            nbBinormalLy = len(vertices[0]["binormal"]) if(vertices[0]["binormal"]) else 0
-            nbUvLy = len(vertices[0]["uv"]) if(vertices[0]["uv"]) else 0
-            nbBoneLayer = len(vertices[0]["blendIndices"]) if(vertices[0]["blendIndices"]) else 0
+            param_names = ['normals', 'binormals', 'uvs', 'bone_weights', 'bone_indices']
+            data = dict(zip(param_names, [[] for x in range(len(param_names))]))
+            for param in data.keys():
+                new_param = self.params_map[param]
+                for i in range(len(vertices[0][new_param])):
+                    data[param].append({'data': []})
+                    if param == 'uvs':
+                        data[param][-1]['resource_name'] = uvs_layers[i].GetName()
+            data.update({'positions': [{'data': []}], 'materials': []})
 
-            data['positions'] = [{'data': []}]
-            for i in range(nbNormalLy):
-                data['normals'].append({'data': []})
-            for i in range(nbBinormalLy):
-                data['binormals'].append({'data': []})
-            for i in range(nbUvLy):
-                data['uvs'].append({'resource_name': ("map"+ str(i +1 )), 'data': []})  #Todo Check if it's always "mapX"
-            for i in range(nbBoneLayer):
-                data['bone_indices'].append({'data': []})
-                data['bone_weights'].append({'data': []})
-
-            for i in range(nbVertex):
+            for i in range(len(vertices)):
                 vertex = vertices[i]
-                
-                data['positions'][0]['data'].append([vertex["position"]["x"], vertex["position"]["y"], vertex["position"]["z"], vertex["position"]["w"] ])
-                for j in range(nbNormalLy):
-                    data['normals'][j]['data'].append([vertex["normal"][j]["x"], vertex["normal"][j]["y"], vertex["normal"][j]["z"], vertex["normal"][j]["w"] ])
-                for j in range(nbBinormalLy):
-                    data['binormals'][j]['data'].append([vertex["binormal"][j]["x"], vertex["binormal"][j]["y"], vertex["binormal"][j]["z"], vertex["binormal"][j]["w"] ])
-                for j in range(nbUvLy):
-                    data['uvs'][j]['data'].append( [vertex["uv"][j]["u"], vertex["uv"][j]["v"] ])
-                for j in range(nbBoneLayer):
-                    data['bone_indices'][j]['data'].append( vertex["blendIndices"][j] )
-                    data['bone_weights'][j]['data'].append( vertex["blendWeights"][j] )
+
+                data['positions'][0]['data'].append(list(vertex['position'].values()))
+                for j in range(len(vertices[0]['normal'])):
+                    data['normals'][j]['data'].append(list(vertex['normal'][j].values()))
+                for j in range(len(vertices[0]['binormal'])):
+                    data['binormals'][j]['data'].append(list(vertex['binormal'][j].values()))
+                for j in range(len(vertices[0]['uv'])):
+                    data['uvs'][j]['data'].append(list(vertex['uv'][j].values()))
+                for j in range(len(vertices[0]['blend_indices'])):
+                    data['bone_indices'][j]['data'].append(vertex['blend_indices'][j])
+                    data['bone_weights'][j]['data'].append(vertex['blend_weights'][j])
 
             for i in range(node.GetMaterialCount()):
                 material = node.GetMaterial(i)
@@ -747,141 +561,62 @@ class FBX:
                 for i in range(texture_count):
                     texture = layered_texture.GetSrcObject(fbx.FbxCriteria.ObjectType(fbx.FbxTexture.ClassId), i)
                     data['materials'].append((texture.GetName(), texture.GetFileName()))
-            
-            
-
-            
-
-            
-
-
-        # ------------------------------------------------------------------- Old version todo remove
-        else: 
-            data['positions'] = [{'data': []}]
-            data['normals'].append({'data': []})
-
-            new_vertex_indices = []
-            for i in range(mesh.GetControlPointsCount()):
-                new_vertex_indices.append([])
-            
-
-            # Using NviTriStripper to generate the strip indices then build the strip
-            j = 0
-            tri_indices = []
-            for i in range(mesh.GetPolygonCount()):
-                indices = [mesh.GetPolygonVertex(i, j) for j in range(3)]
-                tri_indices.extend(indices)
-            tri_indices_text = str(tri_indices).replace(" ", "").replace("[", "").replace("]", "")
-
-            tri_input = open(f"{cm.temp_path}/triangles.txt", "w")
-            tri_input.write(tri_indices_text)
-            tri_input.flush()
-
-            cmd.nvtri_stripper(f"{cm.temp_path}\\triangles.txt", f"{cm.temp_path}\\triangles_out.txt")
-            tri_output = open(f"{cm.temp_path}\\triangles_out.txt", "r")
-            strip_indices = eval(tri_output.readline().strip())
-
-            for idx in strip_indices:
-                data['positions'][0]['data'].append(mesh.GetControlPointAt(idx))
-                new_vertex_indices[idx].append(j)
-                j += 1
-
-            for i in range(mesh.GetLayerCount()):
-                layer = mesh.GetLayer(i)
-
-                if layer.GetUVs() != None:
-                    data['uvs'].append({'resource_name': layer.GetUVs().GetName(), 'data': []})
-
-                uv_ge = mesh.GetElementUV(i)
-                normal_ge = mesh.GetElementNormal(i)
-
-                if uv_ge:
-                    # Keeping one uv per vert
-                    verts_uvs = {}
-                    for j in range(mesh.GetPolygonCount()):
-                        for k in range(3):
-                            idx = mesh.GetPolygonVertex(j, k)
-                            uv = self.get_texture_uv_by_ge(mesh, uv_ge, j, k)
-                            if idx not in verts_uvs.keys():
-                                verts_uvs[idx] = uv
-
-                    for idx in strip_indices:
-                        data['uvs'][i]['data'].append(verts_uvs[idx])
-
-                if normal_ge:
-                    # Keeping one normal per vert
-                    verts_normals = {}
-                    for j in range(mesh.GetPolygonCount()):
-                        for k in range(3):
-                            idx = mesh.GetPolygonVertex(j, k)
-                            normal = normal_ge.GetDirectArray().GetAt(j * 3 + k)
-                            if idx not in verts_normals.keys():
-                                verts_normals[idx] = normal
-
-                    for idx in strip_indices:
-                        data['normals'][i]['data'].append(verts_normals[idx])
-
-            # Bone weights
-            try:
-                skin = mesh.GetDeformer(0)
-
-                for i in range(skin.GetClusterCount()):
-                    cluster = skin.GetCluster(i)
-
-                    if cluster.GetControlPointIndicesCount() > 0:
-                        bone_name = cluster.GetLink().GetName()
-                        bone_idx = ut.search_index_dict(self.bone_names, bone_name)
-                        vertex_indices = cluster.GetControlPointIndices()
-                        weights = cluster.GetControlPointWeights()
-
-                        data['bone_indices'].append({'data': []})
-                        data['bone_weights'].append({'data': []})
-                        for j in range(cluster.GetControlPointIndicesCount()):
-                            # (olganix) we have duplicated vertices to make false triangles
-                            # but we need to target the right vertex indices to link bones.
-                            idx = vertex_indices[j]
-
-                            for k in new_vertex_indices[idx]:
-                                data['bone_indices'][-1]['data'].append({k: bone_idx})
-                                data['bone_weights'][-1]['data'].append({k: weights[j]})
-            except Exception as e:
-                print(e)
-                print(node.GetName())
-
-            for i in range(node.GetMaterialCount()):
-                material = node.GetMaterial(i)
-                prop = material.FindProperty(fbx.FbxSurfaceMaterial.sDiffuse)
-                layered_texture = prop.GetSrcObject(fbx.FbxCriteria.ObjectType(fbx.FbxLayeredTexture.ClassId), 0)
-                if layered_texture:
-                    texture_count = \
-                        layered_texture.GetSrcObjectCount(fbx.FbxCriteria.ObjectType(fbx.FbxTexture.ClassId))
-                for i in range(texture_count):
-                    texture = layered_texture.GetSrcObject(fbx.FbxCriteria.ObjectType(fbx.FbxTexture.ClassId), i)
-                    data['materials'].append((texture.GetName(), texture.GetFileName()))
-            
 
         data = {k: v for k, v in data.items() if v != []}
+
         return data
 
+    def build_layers_data_per_vertex(self, mesh, vertex, layers, param, fbx_le, fbx_layers, callback):
+        for j in range(len(vertex[param])):
+            if (j >= len(fbx_layers)):
+                if param in ['uv', 'binormal']:
+                    param_name = layers[param][j]['resource_name']
+                else:
+                    param_name = param + "_"+ (("_" + str(j)) if (j != 0) else "")
 
+                fbx_layer = fbx_le.Create(mesh, param_name)
+                fbx_layer.SetMappingMode(fbx.FbxLayerElement.eByControlPoint)
+                fbx_layer.SetReferenceMode(fbx.FbxLayerElement.eDirect)
+                fbx_layers.append(fbx_layer)
 
+                layer = mesh.GetLayer(j)
+                if (not layer):
+                    mesh.CreateLayer()
+                    layer = mesh.GetLayer(j)
+                eval(f"layer.{callback}")(fbx_layer)
 
+            fbx_layer = fbx_layers[j]
+            if (param == 'uv'):
+                fbx_layer.GetDirectArray().Add(fbx.FbxVector2(vertex[param][j]['u'], 1.0 - vertex[param][j]['v']))
+            else:
+                fbx_layer.GetDirectArray().Add(fbx.FbxVector4(*vertex[param][j].values()))
 
+    def build_layers_data_per_polygon(self, mesh, layers, param, fbx_le, vertex_indices, callback):
+        for i in range(len(layers)):
+            if param in ['uv', 'binormal']:
+                param_name = layers[i]['resource_name']
+            else:
+                param_name = param + "_"+ (("_" + str(i)) if (i != 0) else "")
+            fbx_layer = fbx_le.Create(mesh, param_name)
+            fbx_layer.SetMappingMode(fbx.FbxLayerElement.eByPolygonVertex)
+            fbx_layer.SetReferenceMode(fbx.FbxLayerElement.eIndexToDirect)
 
+            layer = mesh.GetLayer(i)
+            if (not layer):
+                mesh.CreateLayer()
+                layer = mesh.GetLayer(i)
 
+            for j in range(len(layers[i]['data'])):
+                if param == 'uv':
+                    fbx_layer.GetDirectArray().Add(fbx.FbxVector2(layers[i]['data'][j][0], 1.0 - layers[i]['data'][j][1]))
+                else:
+                    fbx_layer.GetDirectArray().Add(fbx.FbxVector4(*layers[i]['data'][j]))
 
+            # Reindexing verts
+            for idx in vertex_indices:
+                fbx_layer.GetIndexArray().Add(idx)
 
-    ###################################################################################
-    ###################################################################################
-    ###################################################################################
-    ###################################################################################
-    ###################################################################################
-    ################################################################################### 
-    ###################################################################################
-    ###################################################################################
-    ###################################################################################
-    ###################################################################################
-    ###################################################################################
+            eval(f"layer.{callback}")(fbx_layer)
 
     def add_mesh_node(self, manager, scene, content, mesh_parents, layered_mesh_names):
         data = content.data.get_data()
@@ -908,178 +643,123 @@ class FBX:
         mesh = fbx.FbxMesh.Create(manager, f"{name}_mesh")
         node.SetNodeAttribute(mesh)
 
-
-
-
-
-
-
-
-
-
-
         # ------------------------------------------------ 
         # Merge all vertex informations to get just a list of vertex (more easy to deal with)
         # ------------------------------------------------ 
+        # TODO reduce the key's names (ex "position" -> "p") for reduce memory and speed up.
 
+        components_map = {'uv': self.uvs_components, 'color': self.colors_components}
 
-        # todo reduce the key's names (ex "position" -> "p") for reduce memory and speed up.
         vertices = []
-        nbVertex = len(data['positions'][0]['data'])
-        nbColorLy = len(data['colors']) if ('colors' in data) else 0
-        nbNormalLy = len(data['normals']) if ('normals' in data) else 0
-        nbBinormalLy = len(data['binormals']) if ('binormals' in data) else 0
-        nbTangentLy = len(data['tangents']) if ('tangents' in data) else 0
-        nbUvLy = len(data['uvs']) if ('uvs' in data) else 0
-        nbBoneLayer = len(data['bone_weights']) if ('bone_weights' in data) else 0
+        param_names = ['color', 'normal', 'binormal', 'tangent', 'uv', 'blend_indices', 'blend_weights']
+        layers = dict(zip(param_names, [[] for x in range(len(param_names))]))
+        
+        for i in range(len(data['positions'][0]['data'])):
+            vertices.append({})
+            vertices[i] = dict(zip(param_names, [[] for x in range(len(param_names))]))
+            vertices[i]['position'] = dict(zip(self.others_components, data['positions'][0]['data'][i]))
 
-        for i in range(nbVertex):
-            vertices.append( {} )
-            vertices[i]["color"] = []
-            vertices[i]["normal"] = []
-            vertices[i]["binormal"] = []
-            vertices[i]["tangent"] = []
-            vertices[i]["uv"] = []
-            vertices[i]["blendIndices"] = []
-            vertices[i]["blendWeights"] = []
+            for param, layer in data.items():
+                if param not in ['positions', 'bone_indices', 'bone_weights']:
+                    new_param = self.params_map[param]
+                    for j in range(len(layer)):
+                        components = components_map[new_param] if (new_param in components_map) else self.others_components
+                        vertices[i][new_param].append(dict(zip(components, data[param][j]['data'][i])))
+                        if (j >= len(layers[new_param])):
+                            layers[new_param].append({k: v for k, v in data[param][j].items() if k != 'data'})
 
-            vect4_tmp = data['positions'][0]['data'][i]
-            vertices[i]["position"] = {'x': vect4_tmp[0], 'y': vect4_tmp[1], 'z': vect4_tmp[2], 'w': vect4_tmp[3]}
-            
-            if nbColorLy :
-                for j in range(len(data['colors'])):
-                    vect4_tmp = data['colors'][j]['data'][i]
-                    paramName = "color"+ (("_"+ str(j)) if (j!=0) else "") 
-                    vertices[i]["color"].append( {'r': vect4_tmp[0], 'g': vect4_tmp[1], 'b': vect4_tmp[2], 'a': vect4_tmp[3]} )                
-            
-            if nbNormalLy :
-                for j in range(len(data['normals'])):
-                    vect4_tmp = data['normals'][j]['data'][i]
-                    paramName = "normal"+ (("_"+ str(j)) if (j!=0) else "") 
-                    vertices[i]["normal"].append( {'x': vect4_tmp[0], 'y': vect4_tmp[1], 'z': vect4_tmp[2], 'w': vect4_tmp[3]} )
-                    
-            if nbBinormalLy :
-                for j in range(len(data['binormals'])):
-                    vect4_tmp = data['binormals'][j]['data'][i]
-                    paramName = "binormal"+ (("_"+ str(j)) if (j!=0) else "") 
-                    vertices[i]["binormal"].append( {'x': vect4_tmp[0], 'y': vect4_tmp[1], 'z': vect4_tmp[2], 'w': vect4_tmp[3]} )
+            if 'bone_weights' in data:
+                for j in range(len(data['bone_weights'])):
+                    vertices[i]['blend_indices'].append(data['bone_indices'][j]['data'][i][0])
+                    if (j >= len(layers['uv'])):
+                        layers['blend_indices'].append({k: v for k, v in data['bone_indices'][j].items() if k != 'data'})
+                    vertices[i]['blend_weights'].append(data['bone_weights'][j]['data'][i][0])
+                    if (j >= len(layers['blend_weights'])):
+                        layers['blend_weights'].append({k: v for k, v in data['bone_weights'][j].items() if k != 'data'})
 
-            if nbTangentLy :
-                for j in range(len(data['tangents'])):
-                    vect4_tmp = data['tangents'][j]['data'][i]
-                    paramName = "tangent"+ (("_"+ str(j)) if (j!=0) else "") 
-                    vertices[i]["tangent"].append( {'x': vect4_tmp[0], 'y': vect4_tmp[1], 'z': vect4_tmp[2], 'w': vect4_tmp[3]} )
-                    
-            if nbUvLy:
-                for j in range(len(data['uvs'])):
-                    vect4_tmp = data['uvs'][j]['data'][i]
-                    paramName = "uv"+ (("_"+ str(j)) if (j!=0) else "") 
-                    vertices[i]["uv"].append( {'u': vect4_tmp[0], 'v': vect4_tmp[1]} )
-                    
-            if nbBoneLayer:
-                for j in range(nbBoneLayer):
-                    vertices[i]["blendIndices"].append( data['bone_indices'][j]['data'][i][0] )
-                    vertices[i]["blendWeights"].append( data['bone_weights'][j]['data'][i][0] )
-                
-
-            
-        # Faces from Triangle Strips algorythme
+        # Faces from Triangle Strips algorithm
         faces_triangles = []
-        nbVertex = len(vertices)
-        for i in range(nbVertex - 2):               # triangle strips logic
+        for i in range(len(vertices) - 2):
+            # Triangle strips logic
             if (i % 2 == 0):
-                faces_triangles.append( [i, i+1, i+2] )
+                faces_triangles.append([i, i + 1, i + 2])
             else:
-                faces_triangles.append( [i, i+2, i+1] )
+                faces_triangles.append([i, i + 2, i + 1])
         
-        self.createMeshDebugXml("00_SprOriginal", mesh.GetName().replace(":", "_"), vertices, faces_triangles)
-
-
-
-
-
-        # Todo put somewhere as Options
-        removeDuplicateVertex = True
-        removeTriangleStrip = True
-        useFbxFaceOptimisation = False
-        
-
-
+        if self.debug_mode:
+            self.create_mesh_debug_xml("00_SprOriginal", mesh.GetName().replace(":", "_"), vertices, faces_triangles)
 
         # ------------------------------------------------ 
-        # removing duplicate unnecessary vertex 
+        # removing duplicate unnecessary vertices 
         #    (because a good triangle strip is must be on face index, not vertex)
-        # Notice: that will change nothing except having less Vertex in Fbx
+        # Notice: that will change nothing except having less vertices in Fbx
         # ------------------------------------------------ 
 
-        if removeDuplicateVertex:
-            listVertexIdRedirection = []
-            newVertices = []
-            for i in range(nbVertex):
+        if self.remove_duplicate_vertex:
+            list_vertex_id_redirection = []
+            new_vertices = []
+
+            for i in range(len(vertices)):
                 vertex = vertices[i]
+                is_found = -1
 
-                isFound = -1
-                for j in range(len(newVertices)):
-                    vertex_tmp = newVertices[j]
+                for j in range(len(new_vertices)):
+                    vertex_tmp = new_vertices[j]
 
-                    if( (vertex["position"]["x"]!=vertex_tmp["position"]["x"]) or \
-                        (vertex["position"]["y"]!=vertex_tmp["position"]["y"]) or \
-                        (vertex["position"]["z"]!=vertex_tmp["position"]["z"]) or \
-                        (vertex["position"]["w"]!=vertex_tmp["position"]["w"]) ):
+                    if (vertex['position'] != vertex_tmp['position']):
                         continue
                     
-                    listParams = [{"paramName": "normal", "nb": 4}, {"paramName": "binormal", "nb": 4}, {"paramName": "uv", "nb": 2}, {"paramName": "blendIndices", "nb": 1}, {"paramName": "blendWeights", "nb": 1}]
-                    isDiff = False
-                    for k in range(len(listParams)):
-                        param = listParams[k]
-                        paramName = param["paramName"]
-                        nb = param["nb"]
-                        listComponents = ["x", "y", "z", "w"] if (paramName != "uv") else ["u", "v"]
-                        isDirectArray = False if ((paramName!="blendIndices") and (paramName!="blendWeights")) else True
+                    params_dict = {
+                        'normal': 4,
+                        'binormal': 4,
+                        'uv': 2,
+                        'blend_indices': 1,
+                        'blend_weights': 1
+                    }
 
-                        if(len(vertex[paramName])!=len(vertex_tmp[paramName])):
-                            isDiff = True
+                    is_diff = False
+                    for param, nb in params_dict.items():
+                        list_components = self.others_components if (param != 'uv') else self.uvs_components
+                        is_direct_array = param in ['blend_indices', 'blend_weights']
+
+                        if(len(vertex[param]) != len(vertex_tmp[param])):
+                            is_diff = True
                             break
                         
-                        for m in range(len(vertex[paramName])):
+                        for m in range(len(vertex[param])):
                             for n in range(nb):
-                                if ( ((not isDirectArray) and (vertex[paramName][m][ listComponents[n] ] != vertex_tmp[paramName][m][ listComponents[n] ]) ) or\
-                                    ((isDirectArray)  and (vertex[paramName][m] != vertex_tmp[paramName][m]) ) ):
-                                    isDiff = True
+                                if (((not is_direct_array) and 
+                                        (vertex[param][m][list_components[n]] != vertex_tmp[param][m][list_components[n]])) or
+                                     ((is_direct_array) and (vertex[param][m] != vertex_tmp[param][m]))):
+                                    is_diff = True
                                     break
-                            if isDiff: 
+                            if is_diff: 
                                 break
-                        if isDiff: 
+                        if is_diff: 
                             break
-                        
-                    if not isDiff:
-                        isFound = j
+
+                    if not is_diff:
+                        is_found = j
                         break
-                
-                listVertexIdRedirection.append( isFound if(isFound!=-1) else len(newVertices) )
-                if isFound == -1:
-                    newVertices.append(vertex)
+
+                list_vertex_id_redirection.append(is_found if (is_found != -1) else len(new_vertices))
+                if is_found == -1:
+                    new_vertices.append(vertex)
 
             # Now we have just to change index for faces to get the same.
-            newFaces_triangles = []
+            new_faces_triangles = []
             for i in range(len(faces_triangles)): 
-                newTriangle = []
+                new_triangle = []
                 for j in range(3): 
-                    newTriangle.append( listVertexIdRedirection[ faces_triangles[i][j] ] )
-                newFaces_triangles.append( newTriangle )
+                    new_triangle.append(list_vertex_id_redirection[faces_triangles[i][j]])
+                new_faces_triangles.append(new_triangle)
 
+            vertices = new_vertices
+            faces_triangles = new_faces_triangles
 
-            vertices = newVertices
-            faces_triangles = newFaces_triangles
-            # so now the triangle strip is only on faceIndex, we got the same, but we reduce Vertex number
-
-
-            self.createMeshDebugXml("01_VertexReduced", mesh.GetName().replace(":", "_"), vertices, faces_triangles)
-
-
-
-
-
+            # So now the triangle strip is only on face index, we got the same, but we reduce vertex number
+            if self.debug_mode:
+                self.create_mesh_debug_xml("01_VertexReduced", mesh.GetName().replace(":", "_"), vertices, faces_triangles)
 
         # ------------------------------------------------
         # Remove Triangle degenerate strip 
@@ -1088,214 +768,115 @@ class FBX:
         #    mesh.RemoveBadPolygons() detect the bad Triangle, 
         #    so this step is not really necessary, just to have the debug on it
 
-        if removeTriangleStrip :
-            newFaces_triangles = []
+        if self.remove_triangle_strip:
+            new_faces_triangles = []
             for i in range(len(faces_triangles)):
-                triangle = [ faces_triangles[i][0], faces_triangles[i][1], faces_triangles[i][2] ]
+                triangle = faces_triangles[i][0:3]
 
-                # in Triangle strip algo, a degenerative strip (for cut the list) is done with 2 same vertex index in triangle.
-                if((triangle[0]!=triangle[1]) and (triangle[0]!=triangle[2]) and (triangle[1]!=triangle[2])):
-                    newFaces_triangles.append( triangle )        #so keep only triangle with 3 differents index.
+                # In triangle strip algo, a degenerative strip (for cut the list) is done with 2 same vertex index in triangle.
+                if ((triangle[0] != triangle[1]) and (triangle[0] != triangle[2]) and (triangle[1] != triangle[2])):
+                    # So keep only triangles with 3 differents index.
+                    new_faces_triangles.append(triangle)
             
-            faces_triangles = newFaces_triangles
-            self.createMeshDebugXml("02_RemoveStripDegen", mesh.GetName().replace(":", "_"), vertices, faces_triangles)
-        
+            faces_triangles = new_faces_triangles
+            if self.debug_mode:
+                self.create_mesh_debug_xml("02_RemoveStripDegen", mesh.GetName().replace(":", "_"), vertices, faces_triangles)
 
         # ------------------------------------------------
         # Fbx Construction
         # ------------------------------------------------
+        # Test trying to do per Vertex buffers, instead of per Face which complexify for nothing the FBX
 
-        usePerVertex = True         # Test trying to do Per Vertex buffers, intead of perFace witch complexify for nothing the FBX
-        if(usePerVertex):
-            
+        if (self.use_per_vertex):
             scene = mesh.GetScene()
 
             # Vertices
-            nbVertex = len(vertices)
-            mesh.InitControlPoints(nbVertex)
+            mesh.InitControlPoints(len(vertices))
 
+            # Fbx layers data
             fbx_normals = []
             fbx_binormals = []
             fbx_uvs = []
 
+            # One cluster per bone used
             skin = None
-            fbx_boneCluster = []                        # one cluster per Bone USED
-            nbBones = 0
+            fbx_bone_cluster = []
+            nb_bones = 0
             if hasattr(self, 'bone_nodes'):
-                nbBones = len(self.bone_nodes)
-                for i in range(nbBones):
-                    fbx_boneCluster.append(None)
+                nb_bones = len(self.bone_nodes)
+                for i in range(nb_bones):
+                    fbx_bone_cluster.append(None)
 
-
-            for i in range(nbVertex):
+            for i in range(len(vertices)):
                 vertex = vertices[i]
-                
+
                 # Position
-                v = fbx.FbxVector4(vertex["position"]["x"], vertex["position"]["y"], vertex["position"]["z"], vertex["position"]["w"])
+                v = fbx.FbxVector4(*vertex['position'].values())
                 mesh.SetControlPointAt(v, i)
 
-                # Todo VertexColor
+                # TODO vertexColor
+                # TODO Tangent
 
-                # Normal
-                for j in range(len(vertex["normal"])):
-                    normal = vertex["normal"][j]
-
-                    if (j>=len(fbx_normals)):
-                        paramName = "normal_"+ (("_"+ str(j)) if (j!=0) else "") 
-                        fbx_normal = fbx.FbxLayerElementNormal.Create(mesh, paramName)
-                        fbx_normal.SetMappingMode(fbx.FbxLayerElement.eByControlPoint)
-                        fbx_normal.SetReferenceMode(fbx.FbxLayerElement.eDirect)
-                        fbx_normals.append(fbx_normal)
-
-                        layer = mesh.GetLayer(j)
-                        if (not layer):
-                            mesh.CreateLayer()
-                            layer = mesh.GetLayer(j)
-                        layer.SetNormals(fbx_normal)
-                    
-                    fbx_normal = fbx_normals[j]
-                    fbx_normal.GetDirectArray().Add(fbx.FbxVector4(normal["x"], normal["y"], normal["z"], normal["w"]))
-
-                # Binormal
-                for j in range(len(vertex["binormal"])):
-                    binormal = vertex["binormal"][j]
-
-                    if (j>=len(fbx_binormals)):
-                        paramName = "binormal_"+ (("_"+ str(j)) if (j!=0) else "") 
-                        fbx_binormal = fbx.FbxLayerElementBinormal.Create(mesh, paramName)
-                        fbx_binormal.SetMappingMode(fbx.FbxLayerElement.eByControlPoint)
-                        fbx_binormal.SetReferenceMode(fbx.FbxLayerElement.eDirect)
-                        fbx_binormals.append(fbx_binormal)
-
-                        layer = mesh.GetLayer(j)
-                        if (not layer):
-                            mesh.CreateLayer()
-                            layer = mesh.GetLayer(j)
-                        layer.SetBinormals(fbx_binormal)
-                    
-                    fbx_binormal = fbx_binormals[j]
-                    fbx_binormal.GetDirectArray().Add(fbx.FbxVector4(binormal["x"], binormal["y"], binormal["z"], binormal["w"]))
-
-                # Todo Tangent
-
-                # Uv
-                for j in range(len(vertex["uv"])):
-                    uv = vertex["uv"][j]
-
-                    if (j>=len(fbx_uvs)):
-                        paramName = "uv_"+ (("_"+ str(j)) if (j!=0) else "") 
-                        fbx_uv = fbx.FbxLayerElementUV.Create(mesh, paramName)
-                        fbx_uv.SetMappingMode(fbx.FbxLayerElement.eByControlPoint)
-                        fbx_uv.SetReferenceMode(fbx.FbxLayerElement.eDirect)
-                        fbx_uvs.append(fbx_uv)
-
-                        layer = mesh.GetLayer(j)
-                        if (not layer):
-                            mesh.CreateLayer()
-                            layer = mesh.GetLayer(j)
-                        layer.SetUVs(fbx_uv)
-                    
-                    fbx_uv = fbx_uvs[j]
-                    fbx_uv.GetDirectArray().Add(fbx.FbxVector2(uv["u"], 1.0 - uv["v"]))
-
+                # Normals, Binormals, UVs
+                self.build_layers_data_per_vertex(mesh, vertex, layers, "normal", 
+                                                  fbx.FbxLayerElementNormal, fbx_normals, "SetNormals")
+                self.build_layers_data_per_vertex(mesh, vertex, layers, "binormal", 
+                                                  fbx.FbxLayerElementBinormal, fbx_binormals, "SetBinormals")
+                self.build_layers_data_per_vertex(mesh, vertex, layers, "uv", 
+                                                  fbx.FbxLayerElementUV, fbx_uvs, "SetUVs")
 
                 # Bone Blend
-                if(nbBones):
-                    for j in range(len(vertex["blendIndices"])):
-                        indexBone = vertex["blendIndices"][j]
-                        weight = vertex["blendWeights"][j]
+                if (nb_bones):
+                    for j in range(len(vertex["blend_indices"])):
+                        index_bone = vertex["blend_indices"][j]
+                        weight = vertex["blend_weights"][j]
 
-                        if (indexBone>=nbBones):            # Todo Warning
-                            indexBone = 0
-                        
+                        # TODO Warning
 
-                        if (fbx_boneCluster[indexBone] == None):
-                            cluster = fbx.FbxCluster.Create(scene, "bone_"+ str(indexBone) +"_cluster")
+                        if (index_bone >= nb_bones):
+                            index_bone = 0
+
+                        if (fbx_bone_cluster[index_bone] == None):
+                            cluster = fbx.FbxCluster.Create(scene, "bone_" + str(index_bone) + "_cluster")
                             cluster.SetLinkMode(fbx.FbxCluster.eTotalOne)
-                            bone_node = self.bone_nodes[indexBone]
+                            bone_node = self.bone_nodes[index_bone]
                             cluster.SetLink(bone_node)
-                            cluster.SetTransformMatrix(node.EvaluateGlobalTransform()) # Node  support the mesh
+                            # Node support the mesh
+                            cluster.SetTransformMatrix(node.EvaluateGlobalTransform())
                             cluster.SetTransformLinkMatrix(bone_node.EvaluateGlobalTransform())
 
-                            if(skin == None):
+                            if (skin == None):
                                 skin = fbx.FbxSkin.Create(scene, "skin_"+ name)
                                 mesh.AddDeformer(skin)
                             skin.AddCluster(cluster)
-                            fbx_boneCluster[indexBone] = cluster
-                        cluster = fbx_boneCluster[indexBone]
+                            fbx_bone_cluster[index_bone] = cluster
 
+                        cluster = fbx_bone_cluster[index_bone]
                         cluster.AddControlPointIndex(i, weight)
 
-
             # Faces
-            nbTriangles = len(faces_triangles)
-            for i in range(nbTriangles):
+            for i in range(len(faces_triangles)):
                 mesh.BeginPolygon()
                 for j in range(3):
                     mesh.AddPolygon(faces_triangles[i][j])
                 mesh.EndPolygon()
-            
-            
-            # Materials
-            lMaterialElement = fbx.FbxLayerElementNormal.Create(mesh, 'normals')
-            lMaterialElement.SetMappingMode(fbx.FbxLayerElement.eByPolygon)
-            lMaterialElement.SetReferenceMode(fbx.FbxLayerElement.eIndexToDirect)
 
-
-            material_name_parts = name.rsplit(':')
-            if len(material_name_parts) > 2:
-                material_name = ':'.join(material_name_parts[1:])
-            else:
-                material_name = material_name_parts[1]
-            
-            for material in self.data['material']:
-                if ut.b2s_name(material.name) == material_name:
-                    material.data.sort()
-                    mat = self.add_material(scene, material_name)
-
-                    layered_texture = fbx.FbxLayeredTexture.Create(scene, "")
-                    mat.Diffuse.ConnectSrcObject(layered_texture)
-                    node.AddMaterial(mat)
-
-                    for i in range(0, len(material.data.layers)):
-                        layer = material.data.layers[i]
-                        texture = self.add_texture(scene, layer[0], layer[1])
-                        layered_texture.ConnectSrcObject(texture)
-                    break
-        
-            node.SetShadingMode(fbx.FbxNode.eTextureShading)
-            if useFbxFaceOptimisation:
-                mesh.RemoveBadPolygons()
-
-
-
-
-
-            #-------------------------------------------------------
         else:
-
-
             # Removing duplicated vertices
             i = 0
             pos_dict = {}
             old_idx_list = []
-            link_newIndex = []
+            link_new_index = []
             for j in range(len(data['positions'][0]['data'])):
                 vtx = data['positions'][0]['data'][j]
 
-                #isfound = ut.search_index_dict(pos_dict, vtx)      # could use that but create exception when not found value.
-                isfound = -1
-                for i in range(len(pos_dict.values())):
-                    vtx_b = pos_dict[i]
-                    if(vtx == vtx_b) :
-                        isfound = i
-                        break
-
-                if isfound == -1 :
-                    isfound = len(pos_dict)
-                    pos_dict[isfound] = vtx
+                try:
+                    idx = ut.search_index_dict(pos_dict, vtx)
+                except KeyError:
+                    idx = len(pos_dict)
+                    pos_dict[idx] = vtx
                     old_idx_list.append(j)
-                link_newIndex.append(isfound)
+                link_new_index.append(idx)
 
             mesh.InitControlPoints(len(pos_dict))
 
@@ -1304,21 +885,14 @@ class FBX:
             try:
                 for idx in range(len(data['positions'][0]['data'])):
                     vtx = data['positions'][0]['data'][idx]
-                    #idx = ut.search_index_dict(pos_dict, vtx)
+                    i = ut.search_index_dict(pos_dict, vtx)
                     v = fbx.FbxVector4(vtx[0], vtx[1], vtx[2], vtx[3])
-                    mesh.SetControlPointAt(v, idx)
+                    mesh.SetControlPointAt(v, i)
 
                 for i in range(0, len(data['positions'][0]['data']) - 2):
-                    vtx = data['positions'][0]['data'][i]
-                    vtx1 = data['positions'][0]['data'][i + 1]
-                    vtx2 = data['positions'][0]['data'][i + 2]
-
-                    #idx = ut.search_index_dict(pos_dict, vtx)
-                    #idx1 = ut.search_index_dict(pos_dict, vtx1)
-                    #idx2 = ut.search_index_dict(pos_dict, vtx2)
-                    idx =  link_newIndex[i]
-                    idx1 = link_newIndex[i + 1]
-                    idx2 = link_newIndex[i + 2]
+                    idx =  link_new_index[i]
+                    idx1 = link_new_index[i + 1]
+                    idx2 = link_new_index[i + 2]
 
                     mesh.BeginPolygon()
                     mesh.AddPolygon(idx)
@@ -1331,7 +905,6 @@ class FBX:
                         mesh.AddPolygon(idx1)
                         vertex_indices.extend([i, i + 2, i + 1])
                     mesh.EndPolygon()
-
             except Exception as e:
                 print(e)
 
@@ -1377,99 +950,42 @@ class FBX:
             except Exception as e:
                 print(e)
 
-            # Normals
+            # Normals, Binormals, UVs
             try:
-                for i in range(len(data['normals'])):
-                    normal_le = fbx.FbxLayerElementNormal.Create(mesh, 'normals')
-                    normal_le.SetMappingMode(fbx.FbxLayerElement.eByPolygonVertex)
-                    normal_le.SetReferenceMode(fbx.FbxLayerElement.eIndexToDirect)
-
-                    layer = mesh.GetLayer(i)
-                    if (not layer):
-                        mesh.CreateLayer()
-                        layer = mesh.GetLayer(i)
-
-                    for j in range(len(data['normals'][i]['data'])):
-                        normal_le.GetDirectArray().Add(fbx.FbxVector4(*data['normals'][i]['data'][j]))
-
-                    # Reindexing normals
-                    for idx in vertex_indices:
-                        normal_le.GetIndexArray().Add(idx)
-
-                    layer.SetNormals(normal_le)
+                self.build_layers_data_per_polygon(mesh, data['normals'], 'normal', 
+                                                   fbx.FbxLayerElementNormal, vertex_indices, "SetNormals")
+                if 'binormals' in data:
+                    self.build_layers_data_per_polygon(mesh, data['binormals'], 'binormal', 
+                                                       fbx.FbxLayerElementBinormal, vertex_indices, "SetBinormals")
+                self.build_layers_data_per_polygon(mesh, data['uvs'], 'uv', 
+                                                   fbx.FbxLayerElementUV, vertex_indices, "SetUVs")
             except Exception as e:
                 print(e)
 
-            # Binormals
-            try:
-                for i in range(len(data['binormals'])):
-                    binormal_le = fbx.FbxLayerElementBinormal.Create(mesh, 'binormals')
-                    binormal_le.SetMappingMode(fbx.FbxLayerElement.eByPolygonVertex)
-                    binormal_le.SetReferenceMode(fbx.FbxLayerElement.eIndexToDirect)
-
-                    layer = mesh.GetLayer(i)
-                    if (not layer):
-                        mesh.CreateLayer()
-                        layer = mesh.GetLayer(i)
-
-                    for j in range(len(data['binormals'][i]['data'])):
-                        binormal_le.GetDirectArray().Add(fbx.FbxVector4(*data['binormals'][i]['data'][j]))
-
-                    # Reindexing binormals
-                    for idx in vertex_indices:
-                        binormal_le.GetIndexArray().Add(idx)
-
-                    layer.SetBinormals(binormal_le)
-            except Exception as e:
-                pass
-
-            # UVs
-            try:
-                for i in range(len(data['uvs'])):
-                    uv_le = fbx.FbxLayerElementUV.Create(mesh, data['uvs'][i]['resource_name'])
-                    uv_le.SetMappingMode(fbx.FbxLayerElement.eByPolygonVertex)
-                    uv_le.SetReferenceMode(fbx.FbxLayerElement.eIndexToDirect)
-
-                    layer = mesh.GetLayer(i)
-                    if (not layer):
-                        mesh.CreateLayer()
-                        layer = mesh.GetLayer(i)
-
-                    for uvs in data['uvs'][i]['data']:
-                        uv_le.GetDirectArray().Add(fbx.FbxVector2(uvs[0], 1.0 -uvs[1]))
-
-                    # Reindexing UVs
-                    for idx in vertex_indices:
-                        uv_le.GetIndexArray().Add(idx)
-
-                    typeId = fbx.FbxLayerElement.eTextureDiffuse
-                    layer.SetUVs(uv_le, typeId)
-            except Exception as e:
-                print(e)
-
-            # Materials
-            material_name_parts = name.rsplit(':')
-            if len(material_name_parts) > 2:
-                material_name = ':'.join(material_name_parts[1:])
-            else:
-                material_name = material_name_parts[1]
-            
-            for material in self.data['material']:
-                if ut.b2s_name(material.name) == material_name:
-                    material.data.sort()
-                    mat = self.add_material(scene, material_name)
-
-                    layered_texture = fbx.FbxLayeredTexture.Create(scene, "")
-                    mat.Diffuse.ConnectSrcObject(layered_texture)
-                    node.AddMaterial(mat)
-
-                    for i in range(0, len(material.data.layers)):
-                        layer = material.data.layers[i]
-                        texture = self.add_texture(scene, layer[0], layer[1])
-                        layered_texture.ConnectSrcObject(texture)
-                    break
+        # Materials
+        material_name_parts = name.rsplit(':')
+        if len(material_name_parts) > 2:
+            material_name = ':'.join(material_name_parts[1:])
+        else:
+            material_name = material_name_parts[1]
         
-            node.SetShadingMode(fbx.FbxNode.eTextureShading)
+        for material in self.data['material']:
+            if ut.b2s_name(material.name) == material_name:
+                material.data.sort()
+                mat = self.add_material(scene, material_name)
+
+                layered_texture = fbx.FbxLayeredTexture.Create(scene, "")
+                mat.Diffuse.ConnectSrcObject(layered_texture)
+                node.AddMaterial(mat)
+
+                for i in range(0, len(material.data.layers)):
+                    layer = material.data.layers[i]
+                    texture = self.add_texture(scene, layer[0], layer[1])
+                    layered_texture.ConnectSrcObject(texture)
+                break
+    
+        node.SetShadingMode(fbx.FbxNode.eTextureShading)
+        if self.use_fbx_face_optimisation:
             mesh.RemoveBadPolygons()
 
         return node
@@ -1570,9 +1086,11 @@ class FBX:
             return name.replace(f"[{layer_name}]", '')
         return name
 
-    def resize(self, array, new_size, new_value=0):                   # https://stackoverflow.com/questions/30503792/resize-an-array-with-a-specific-value
-        # """Resize to biggest or lesser size."""
-        element_size = len(array[0]) #Quantity of new elements equals to quantity of first element
+    def resize(self, array, new_size, new_value = 0):
+        # https://stackoverflow.com/questions/30503792/resize-an-array-with-a-specific-value
+        """Resize to biggest or lesser size."""
+        # Quantity of new elements equals to quantity of first element
+        element_size = len(array[0])
         if new_size > len(array):
             new_size = new_size - 1
             while len(array)<=new_size:
@@ -1582,79 +1100,61 @@ class FBX:
             array = array[:new_size]
         return array
 
+    def create_mesh_debug_xml(self, folder_name = "debug_mesh", name = "", vertices = [], faces_triangles = []):
+        # Hyp : all vertices have the same nb_layers for each normals, uv, etc .. (bone blend indices and weight are fill by 0, 0.0 to complete)
 
+        count_dict = {
+            'color': len(vertices[0]['color']) if (len(vertices) and vertices[0]['color']) else 0,
+            'normal': len(vertices[0]['normal']) if (len(vertices) and vertices[0]['normal']) else 0,
+            'binormal': len(vertices[0]['binormal']) if (len(vertices) and vertices[0]['binormal']) else 0,
+            'tangent': len(vertices[0]['tangent']) if (len(vertices) and vertices[0]['tangent']) else 0,
+            'uv': len(vertices[0]['uv']) if (len(vertices) and vertices[0]['uv']) else 0,
+            'blend_indices': len(vertices[0]['blend_indices']) if (len(vertices) and vertices[0]['blend_indices']) else 0
+        }
 
+        components_map = {'uv': self.uvs_components, 'color': self.colors_components}
 
-    def createMeshDebugXml(self, folderName = "debugMesh", name = "", vertices = [], faces_triangles = []):   
-        #Hyp : all vertices have the same nbLayers for each normals, uv, etc .. (bone blend indices and weight are fill by 0 ,0.0 to complete)
+        root_node = {'Mesh': {'attr': {'name': name, 'nbVertex': len(vertices)},'children': []}}
+        root_node['Mesh']['attr'].update(
+            dict(zip(['nbColorLy', 'nbNormalLy', 'nbBinormalLy', 'nbTangentLy', 'nbUvLy', 'nbBoneLayer'], count_dict.values()))
+        )
 
-        nbVertex = len(vertices)
-        nbColorLy = len(vertices[0]['color']) if((nbVertex) and (vertices[0]['color'])) else 0
-        nbNormalLy = len(vertices[0]['normal']) if((nbVertex) and (vertices[0]['normal'])) else 0
-        nbBinormalLy = len(vertices[0]['binormal']) if((nbVertex) and (vertices[0]['binormal'])) else 0
-        nbTangentLy = len(vertices[0]['tangent']) if((nbVertex) and (vertices[0]['tangent'])) else 0
-        nbUvLy = len(vertices[0]['uv']) if((nbVertex) and (vertices[0]['uv'])) else 0
-        nbBoneLayer = len(vertices[0]['blendIndices']) if((nbVertex) and (vertices[0]['blendIndices'])) else 0
+        vertices_node = {'Vertices': {'children': []}}
+        root_node['Mesh']['children'].append(vertices_node)
 
-        debug_str = '<Mesh name="'+ name +'" nbVertex="'+ str(nbVertex) +'" nbColorLy="'+ str(nbColorLy) +'" nbNormalLy="'+ str(nbNormalLy) +'" nbBinormalLy="'+ str(nbBinormalLy) +'" nbTangentLy="'+ str(nbTangentLy) +'" nbUvLy="'+ str(nbUvLy) +'" nbBoneLayer="'+ str(nbBoneLayer) +'" >\n'
-        debug_str += '\t<Vertices>\n'
-        for i in range(nbVertex):
+        for i in range(len(vertices)):
             vertex = vertices[i]
 
-            debug_str += '\t\t<Vertex index="'+ str(i) +'">\n'
-            debug_str += '\t\t\t<Position x="'+ str(vertex["position"]["x"]) +'"\ty="'+ str(vertex["position"]["y"]) +'"\tz="'+ str(vertex["position"]["z"]) +'"\tw="'+ str(vertex["position"]["w"]) +'" />\n'
-            
-            for j in range(nbColorLy):
-                paramName = "color"+ (("_"+ str(j)) if (j!=0) else "") 
-                debug_str += '\t\t\t<'+ paramName  +' r="'+ str(vertex["color"][j]["r"]) +'"\tg="'+ str(vertex["color"][j]["g"]) +'"\tb="'+ str(vertex["color"][j]["b"]) +'"\ta="'+ str(vertex["color"][j]["a"]) +'" />\n'
-            
-            for j in range(nbNormalLy):
-                paramName = "normal"+ (("_"+ str(j)) if (j!=0) else "") 
-                debug_str += '\t\t\t<'+ paramName  +' x="'+ str(vertex["normal"][j]["x"]) +'"\ty="'+ str(vertex["normal"][j]["y"]) +'"\tz="'+ str(vertex["normal"][j]["z"]) +'"\tw="'+ str(vertex["normal"][j]["w"]) +'" />\n'
-            
-            for j in range(nbBinormalLy):
-                paramName = "binormal"+ (("_"+ str(j)) if (j!=0) else "") 
-                debug_str += '\t\t\t<'+ paramName  +' x="'+ str(vertex["binormal"][j]["x"]) +'"\ty="'+ str(vertex["binormal"][j]["y"]) +'"\tz="'+ str(vertex["binormal"][j]["z"]) +'"\tw="'+ str(vertex["binormal"][j]["w"]) +'" />\n'
-            
-            for j in range(nbTangentLy):
-                paramName = "tangent"+ (("_"+ str(j)) if (j!=0) else "") 
-                debug_str += '\t\t\t<'+ paramName  +' x="'+ str(vertex["tangent"][j]["x"]) +'"\ty="'+ str(vertex["tangent"][j]["y"]) +'"\tz="'+ str(vertex["tangent"][j]["z"]) +'"\tw="'+ str(vertex["tangent"][j]["w"]) +'" />\n'
+            vertex_node = {'Vertex': {'attr': {'index': i}, 'children': []}}
+            vertices_node['Vertices']['children'].append(vertex_node)
 
-            for j in range(nbUvLy):
-                paramName = "uv"+ (("_"+ str(j)) if (j!=0) else "") 
-                debug_str += '\t\t\t<'+ paramName  +' u="'+ str(vertex["uv"][j]["u"]) +'"\tv="'+ str(vertex["uv"][j]["v"]) +'" />\n'
+            position_node = {'Position': {'attr': dict(zip(self.others_components, vertex['position'].values()))}}
+            vertex_node['Vertex']['children'].append(position_node)
 
-            if nbBoneLayer:
-                debug_indices_Str = ""
-                debug_weight_Str = ""
-                for j in range(nbBoneLayer):
-                    debug_indices_Str += (", " if(j!=0) else "") + str(vertex["blendIndices"][j]) 
-                    debug_weight_Str  += (", " if(j!=0) else "") + str(vertex["blendWeights"][j])
-                debug_str += '\t\t\t<Blend indices="'+ debug_indices_Str +'" weights="'+ debug_weight_Str +'" />\n'
+            for param, size in count_dict.items():
+                for j in range(size):
+                    param_name = param + (("_" + str(j)) if (j != 0) else "")
+                    components = components_map[param] if (param in components_map) else self.others_components
+                    if param != 'blend_indices':
+                        vertex_node['Vertex']['children'].append({param_name: {'attr': dict(zip(components, vertex[param][j].values()))}})
+                if param == 'blend_indices':
+                    blend_node = {'Blend': {'attr': {'indices': vertex[param], 'weights': vertex['blend_weights']}}}
+                    vertex_node['Vertex']['children'].append(blend_node)
 
-            debug_str += '\t\t</Vertex>\n'
-        debug_str += '\t</Vertices>\n'
-
-
-        #Faces
-        nbFaces = len(faces_triangles)
-        debug_str += '\t<Faces nbFaces="'+ str(nbFaces) +'" >\n'
+        # Faces
+        faces_node = {'Faces': {'attr': {'nbFaces': len(faces_triangles)}, 'children': []}}
         for i in range(len(faces_triangles)):
             triangle = faces_triangles[i]
-            debug_str += '\t\t<Triangle a="'+ str(triangle[0]) +'"\tb="'+ str(triangle[1]) +'"\tc="'+ str(triangle[2]) +'" />\n'
-        debug_str += '\t</Faces>\n'
+            faces_node['Faces']['children'].append({'Triangle': {'attr': dict(zip(['a','b','c'], triangle))}})
+        root_node['Mesh']['children'].append(faces_node)
 
-        debug_str += '</Mesh>\n'
+        last_working_dir = os.getcwd()
+        if not os.path.exists(folder_name):
+            os.mkdir(folder_name)
+        os.chdir(folder_name)
 
-        lastWorkingDir = os.getcwd()
-        if not os.path.exists(folderName):
-            os.mkdir(folderName)
-        os.chdir(folderName)
+        xml_obj = XML()
+        stream = open(name + ".xml", "w")
+        xml_obj.write(stream, root_node)
 
-        data_stream = open(name +".xml", "w")
-        data_stream.write(str(debug_str))
-
-        os.chdir(lastWorkingDir)
-    
-
-        
+        os.chdir(last_working_dir)

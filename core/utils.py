@@ -25,9 +25,7 @@ def search_index_dict(dict, search_val):
     for key, val in dict.items():
         if val == search_val:
             return key
-    if len(search_val) > 0:
-        print(search_val)
-    raise Exception("Key not found in dict")
+    raise KeyError("Key not found in dict: " + str(search_val))
 
 # Search value in list values of dict
 def search_index_dict_list(dict, search_val):

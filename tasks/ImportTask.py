@@ -23,6 +23,8 @@ import core.utils as ut
 import core.common as cm
 
 class ImportTask(Task):
+    version_from_vertices_list = True
+
     def __init__(self, data, input_path, spr_path, ioram_path, vram_path, other_files):
         super().__init__()
         self.data = data
@@ -250,8 +252,6 @@ class ImportTask(Task):
             scne_parts = {}
             scene_layers = {}
 
-            versionFromVerticeList = True
-
             for mesh_name, data in fbx_object.mesh_data.items():
                 layered_mesh_name = mesh_name
                 layer_name, mesh_name = self.format_name(mesh_name, '', '')
@@ -268,12 +268,10 @@ class ImportTask(Task):
 
                     vbuf_object = VBUF('', '', spr_object.string_table)
 
-                    
-                    if not versionFromVerticeList:           
-
+                    if not self.version_from_vertices_list:       
                         # Adjusting weights and indices data from FBX to RB format 
                         #  -> there are listed by bone/cluster and after by vertex, so you need to inverse lists, and get back layer notion
-                        # it's allready done into mode versionFromVerticeList
+                        # it's already done into mode version_from_vertices_list
                         weights = data['bone_weights']
                         indices = data['bone_indices']
                         
@@ -352,12 +350,12 @@ class ImportTask(Task):
                                         vtx = decl_data['data'][i]
                                         decl_data['data'][i] = (vtx[0], vtx[1], vtx[2], 0.0)
 
-                                elif ((versionFromVerticeList) and (vtx_usage == 'uvs')):
+                                elif ((self.version_from_vertices_list) and (vtx_usage == 'uvs')):
                                     for i in range(len(decl_data['data'])):
                                         vtx = decl_data['data'][i]
                                         decl_data['data'][i] = (vtx[0], vtx[1])
 
-                                elif ((versionFromVerticeList) and ((vtx_usage == 'bone_indices') or (vtx_usage == 'bone_weights'))):
+                                elif ((self.version_from_vertices_list) and (vtx_usage in ['bone_indices', 'bone_weights'])):
                                     for i in range(len(decl_data['data'])):
                                         decl_data['data'][i] = [decl_data['data'][i]]
 
@@ -491,7 +489,7 @@ class ImportTask(Task):
                 except Exception as e:
                     print(mesh_name)
                     print(e)
-                
+
                 vbuf_object.load_data()
                 if b'EYE' in mesh_name:
                     for i in range(len(vbuf_object.vertex_decl)):
