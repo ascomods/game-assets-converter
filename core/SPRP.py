@@ -260,6 +260,7 @@ class SPRPDataEntry:
         self.type = data_type
         self.name = name
         self.realName = None
+        self.index = -1
         self.string_table = string_table
         self.is_main_type = is_main_type
         self.children = []

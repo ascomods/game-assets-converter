@@ -3,6 +3,7 @@ import json
 from tasks.Task import Task
 from core.FBX import FBX
 import core.utils as ut
+import numpy as np
 
 class ExportTask(Task):
     def __init__(self, data, output_path):
@@ -27,8 +28,8 @@ class ExportTask(Task):
             
 
             # BONE
+            bone_dict = {}
             try:
-                bone_dict = {}
                 bone_entries = bone_data[0].data.bone_entries
                 if len(bone_data) > 1:
                     bone_base_data = bone_data[0].get_data()['data']
@@ -201,22 +202,33 @@ class ExportTask(Task):
 
             # -------------------------- create full BONE.xml
             global incBone
+            global debugMeshs
             incBone = 0
+            debugMeshs = []
 
-            def createBoneNodeXml_recur(node_tmp, indentation, matrixToDisplay):
+            def createBoneNodeXml_recur(node_tmp, indentation, matrixToDisplay, boneList):
                 global incBone
+                global debugMeshs
+
                 indent = ""
                 for i in range(indentation):
                     indent += "\t"
                 indentation += 1
 
-                name = ut.b2s_name(node_tmp.name)    
+                name = ut.b2s_name(node_tmp.name)
+                extraAttributsStr = ""
+                data = bone_dict[name] 
+
 
                 node_TagName = "Bone"
                 datasXml = ""
                 if(indentation==0):
                     node_TagName = "Bones"
                 else:
+                    extraAttributsStr += ' index="'+ str(node_tmp.index) +'" '
+                    #extraAttributsStr += '  hierarchy_bytes="'+ str(node_tmp.hierarchy_bytes) +'" unknown0x24="'+ str(node_tmp.unknown0x24) +'" '
+                    #Todo better display of 0xxxx (that break the string)
+                    # group_idx="'+ str(node_tmp.group_idx) +'"  => it's just the deep level in tree
                     
                     def createBoneNodeXml_recur_Matrix(name, t):
                         datasXml = ""
@@ -239,12 +251,139 @@ class ExportTask(Task):
                     if(matrixToDisplay["rel_transform"]):
                         datasXml += createBoneNodeXml_recur_Matrix("RelativeTransform", node_tmp.rel_transform)
                     if(matrixToDisplay["transform1"]):
-                        datasXml += createBoneNodeXml_recur_Matrix("Transf_1", node_tmp.transform1)
+                        t = node_tmp.transform1
+                        minV3 = [t[0][0], t[1][0], t[2][0]]
+                        maxV3 = [t[3][0], t[0][1], t[1][1]]
+                        matrix3x3 = [[t[2][1], t[3][1], t[0][2]], [t[1][2], t[2][2], t[3][2]], [t[0][3], t[1][3], t[2][3]] ]
+                        scale = t[3][3]
+                        datasXml = ""
+                        datasXml += indent +'\t<Transf_1>\n'
+                        datasXml += indent +'\t\t<MinRotAngles x="'+ str(np.rad2deg(minV3[0])) +'" y="'+ str(np.rad2deg(minV3[1])) +'" z="'+ str(np.rad2deg(minV3[2])) +'" />\n'
+                        datasXml += indent +'\t\t<MaxRotAngles x="'+ str(np.rad2deg(maxV3[0])) +'" y="'+ str(np.rad2deg(maxV3[1])) +'" z="'+ str(np.rad2deg(maxV3[2])) +'" />\n'
+                        datasXml += indent +'\t\t<Matrix3>\n'
+                        datasXml += indent +'\t\t\t<Line x="'+ str(matrix3x3[0][0]) +'" y="'+ str(matrix3x3[0][1]) +'" z="'+ str(matrix3x3[0][2]) +'" />\n'
+                        datasXml += indent +'\t\t\t<Line x="'+ str(matrix3x3[1][0]) +'" y="'+ str(matrix3x3[1][1]) +'" z="'+ str(matrix3x3[1][2]) +'" />\n'
+                        datasXml += indent +'\t\t\t<Line x="'+ str(matrix3x3[2][0]) +'" y="'+ str(matrix3x3[2][1]) +'" z="'+ str(matrix3x3[2][2]) +'" />\n'
+                        datasXml += indent +'\t\t</Matrix3>\n'
+                        datasXml += indent +'\t\t<UnknowScale value="'+ str(scale) +'" />\n'
+                        datasXml += indent +'\t</Transf_1>\n'
+
+
+                        def createBoneNodeXml_recur_CreateRotatedCube(minV3, maxV3, matrix3x3, scale, node_tmp, suffix):
+                            global debugMeshs
+
+                            debugMesh = {"name": ut.b2s_name(node_tmp.name)+ suffix, "vertices": [], "faces": []}
+                            #if(debugMesh["name"] !="HAIR01_T1"):
+                            #    return
+                            
+                            debugMeshs.append( debugMesh )
+            
+                            
+                            #simple Cube, center on bottom center  Todo Remove
+                            minV3 = [-0.5, -0.5, -0.5]
+                            maxV3 = [0.5, 0.5, 0.5]
+
+
+                            vertices = debugMesh["vertices"]
+                            faces = debugMesh["faces"]
+                            startVIndex = len(vertices)
+                            startFIndex = len(faces)
+                            
+                            cubeVertex = [  [minV3[0], minV3[1], minV3[2]],\
+                                            [maxV3[0], minV3[1], minV3[2]],\
+                                            [maxV3[0], minV3[1], maxV3[2]],\
+                                            [minV3[0], minV3[1], maxV3[2]],\
+                                            [minV3[0], maxV3[1], minV3[2]],\
+                                            [maxV3[0], maxV3[1], minV3[2]],\
+                                            [maxV3[0], maxV3[1], maxV3[2]],\
+                                            [minV3[0], maxV3[1], maxV3[2]] ]  # 0:A, 1:B, 2:C, 3:D, 4:E, 5:F, 6:G, 7:H
+                            
+                            #RotZ=-90 : X = -y, Y= x Z=Z
+                            # cubeVertex = [  [minV3[1], -minV3[0], minV3[2]],\
+                            #                 [minV3[1], -maxV3[0], minV3[2]],\
+                            #                 [minV3[1], -maxV3[0], maxV3[2]],\
+                            #                 [minV3[1], -minV3[0], maxV3[2]],\
+                            #                 [maxV3[1], -minV3[0], minV3[2]],\
+                            #                 [maxV3[1], -maxV3[0], minV3[2]],\
+                            #                 [maxV3[1], -maxV3[0], maxV3[2]],\
+                            #                 [maxV3[1], -minV3[0], maxV3[2]] ]  # 0:A, 1:B, 2:C, 3:D, 4:E, 5:F, 6:G, 7:H
+
+                            #multiply by the Absolute Transform of Bone and matrix3x3
+                            t = node_tmp.abs_transform
+                            bone_AbsTf_Matrix4x4 = []
+                            for i in range(4):
+                                bone_AbsTf_Matrix4x4.append( [ t[0][i], t[1][i], t[2][i], t[3][i] ] )
+
+                            t = node_tmp.inv_transform
+                            bone_invTf_Matrix4x4 = []
+                            for i in range(4):
+                                bone_invTf_Matrix4x4.append( [ t[0][i], t[1][i], t[2][i], t[3][i] ] )
+
+                            node_pos = ut.getPositionFromMat4(bone_AbsTf_Matrix4x4)
+
+                            for i in range(len(cubeVertex)):
+                                v = cubeVertex[i]
+
+                                v = ut.multiply_Vect3_float(v, scale)
+
+                                v = ut.multiply_Mat3_Vect3(ut.transpose_Mat3(matrix3x3), v)
+                                v = ut.multiply_Mat4_Vect3(ut.transpose_Mat4(bone_AbsTf_Matrix4x4), v)
+                                #v = ut.multiply_Mat4_Vect3(ut.transpose_Mat4(bone_invTf_Matrix4x4), v)
+                                #v = ut.addVect3(v, node_pos)
+
+                                vertices.append( {"position": {"x": v[0], "y": v[1], "z": v[2], "w": 1.0}, "bone_indices": node_tmp.index, "bone_weights": 1.0  } )    #Todo check how node_tmp.index is done in FBX.py
+                            
+                            #multiplcation with T1.UnkowwFloat ?
+
+                            # Bottom ABCD
+                            faces.append( [startFIndex + 0, startFIndex + 2, startFIndex + 1] )     # ACB
+                            faces.append( [startFIndex + 0, startFIndex + 3, startFIndex + 2] )     # ADC
+                            # Up EFGH
+                            faces.append( [startFIndex + 4, startFIndex + 5, startFIndex + 6] )     # EFG
+                            faces.append( [startFIndex + 4, startFIndex + 6, startFIndex + 7] )     # EGH
+                            # Side ADHE
+                            faces.append( [startFIndex + 0, startFIndex + 3, startFIndex + 7] )     # ADH
+                            faces.append( [startFIndex + 0, startFIndex + 7, startFIndex + 4] )     # AHE
+                            # Side FEAB
+                            faces.append( [startFIndex + 5, startFIndex + 4, startFIndex + 0] )     # FEA
+                            faces.append( [startFIndex + 5, startFIndex + 0, startFIndex + 1] )     # FAB
+                            # Side GFBC
+                            faces.append( [startFIndex + 6, startFIndex + 5, startFIndex + 1] )     # GFB
+                            faces.append( [startFIndex + 6, startFIndex + 1, startFIndex + 2] )     # GBC
+                            # Side HGCD
+                            faces.append( [startFIndex + 7, startFIndex + 6, startFIndex + 2] )     # HGC
+                            faces.append( [startFIndex + 7, startFIndex + 2, startFIndex + 3] )     # HCD
+                        
+                        
+                        if(scale!=0):
+                            createBoneNodeXml_recur_CreateRotatedCube(minV3, maxV3, matrix3x3, scale, node_tmp, "_T1")
+
+
+                            
+
+                            
+
+
+                            
+
+
+                        
+
                     if(matrixToDisplay["transform2"]):
                         datasXml += createBoneNodeXml_recur_Matrix("Transf_2", node_tmp.transform2)
                     
-                    #if(matrixToDisplay["DbzBoneInfo"]):
-                    # Todo
+
+                    if((data) and (data["DbzBoneInfo"]) and (matrixToDisplay["DbzBoneInfo"])):
+                        dbzBoneInfo = data["DbzBoneInfo"]
+                        #datasXml += indent +'\t<DbzBoneInfo  unk0="'+ str(dbzBoneInfo["unknown0x00"]) +'" >\n'     # Todo solve display
+                        #Todo better display of 0xxxx (that break the string)
+                        datasXml += indent +'\t<DbzBoneInfo >\n'
+                        listV3 = dbzBoneInfo["data"]
+                        datasXml += indent +'\t\t<unk0 x="'+ str(listV3[0]) +'" y="'+ str(listV3[1]) +'" z="'+ str(listV3[2]) +'" >\n'
+                        datasXml += indent +'\t\t<unk1 x="'+ str(listV3[3]) +'" y="'+ str(listV3[4]) +'" z="'+ str(listV3[5]) +'" >\n'
+                        datasXml += indent +'\t\t<unk2 x="'+ str(listV3[6]) +'" y="'+ str(listV3[7]) +'" z="'+ str(listV3[8]) +'" >\n'
+                        datasXml += indent +'\t</DbzBoneInfo>\n'
+                        # => it's vextor3_sero, + negative Translation of RelativeMatrix  (twice vector, but why ?)
 
                     # Todo add traduction into position rotation scale (Absolute and relative)
                     # Todo look at the differencies with Inv and Abs Matrix (only position but why ?)
@@ -253,23 +392,28 @@ class ExportTask(Task):
                 haveChilds = ((node_tmp.children)and (len(node_tmp.children)))
                 haveDatas = (datasXml!="")
 
-                xmlStr = indent +'<!--Index: '+ str(incBone) +'-->'
+                xmlStr = ""
+                #xmlStr += indent +'<!--Index: '+ str(incBone) +'-->'
                 incBone += 1
-                xmlStr = indent +'<'+ node_TagName +' '+ ((' name="'+ name +'" ') if(name!="") else "") + (">\n" if(haveChilds or haveDatas) else "/>\n")
+                xmlStr += indent +'<'+ node_TagName +' '+ ((' name="'+ name +'" ') if(name!="") else "") + extraAttributsStr + (">\n" if(haveChilds or haveDatas) else "/>\n")
                 xmlStr += datasXml
 
                 if(haveChilds):
                     
                     for i in range(len(node_tmp.children)):
-                        xmlStr += createBoneNodeXml_recur(node_tmp.children[i], indentation, matrixToDisplay)
+                        xmlStr += createBoneNodeXml_recur(node_tmp.children[i], indentation, matrixToDisplay, boneList)
                     
                 if(haveChilds or haveDatas):
                     xmlStr += (indent) +'</'+ node_TagName +'>\n'
                 return xmlStr
             
+            for i in range(len(bone_data[0].data.bone_entries)):
+                bone_data[0].data.bone_entries[i].index = i
+
             incBone = 0
-            matrixToDisplay = {"abs_transform": True, "inv_transform": True, "rel_transform": True, "transform1": True, "transform2": True, "DbzBoneInfo": True}
-            xmlStr = createBoneNodeXml_recur(bone_data[0].data.bone_entries[0], 0, matrixToDisplay)
+            debugMeshs = []
+            matrixToDisplay = {"abs_transform": True, "inv_transform": True, "rel_transform": True, "transform1": True, "transform2": True, "DbzBoneInfo": False}
+            xmlStr = createBoneNodeXml_recur(bone_data[0].data.bone_entries[0], 0, matrixToDisplay, bone_data[0].data.bone_entries)
             data_stream = open(f"{self.output_path}\BONE.xml", "w")
             data_stream.write(str(xmlStr))
 
@@ -359,7 +503,8 @@ class ExportTask(Task):
                         xmlStr += indent +'\t<Childs>\n'
                         indentation += 1
                     for i in range(len(node_tmp.children)):
-                        xmlStr += createSceneNodeXml_recur(node_tmp.children[i], indentation)
+                        #xmlStr += createSceneNodeXml_recur(node_tmp.children[i], indentation)
+                        xmlStr += createSceneNodeXml_recur(node_tmp.children[ (len(node_tmp.children) - 1) - i ], indentation)
                         if node_TagName == "NODES" :    #on Node , we take only the first (others should be children normaly)
                             break
                     
@@ -443,7 +588,7 @@ class ExportTask(Task):
                 'texture': tx2d_data,
                 'material': mtrl_data
             }
-            fbx_object.save(self.output_path)
+            fbx_object.save(self.output_path, debugMeshs)
 
             self.send_progress(100)
             self.result_signal.emit(self.__class__.__name__)

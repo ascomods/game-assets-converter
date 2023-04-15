@@ -114,7 +114,13 @@ class FBX:
                 self.mesh_data[name] = self.get_mesh_data(node)
                 self.mesh_nodes[name] = node
 
-    def save(self, path):
+
+
+
+
+
+
+    def save(self, path, debugMeshs):
         if not os.path.exists(path):
             os.mkdir(path)
         os.chdir(path)
@@ -137,7 +143,7 @@ class FBX:
         #fbx_manager.GetIOSettings().SetIntProp(fbx.EXP_FBX_COMPRESS_LEVEL, 9)  #Todo uncomment
 
 
-        self.handle_data(fbx_manager, scene, path)
+        self.handle_data(fbx_manager, scene, path, debugMeshs)
         
         # root_node = scene.GetRootNode()        #Test Todo remove
         # for i in range(root_node.GetChildCount()):
@@ -165,7 +171,7 @@ class FBX:
 
 
 
-    def handle_data(self, manager, scene, path):
+    def handle_data(self, manager, scene, path, debugMeshs):
         remaining = []
         for texture in self.data['texture']:
             name, ext = os.path.splitext(ut.b2s_name(texture.name))
@@ -313,6 +319,10 @@ class FBX:
         # Build nodes
         for model in self.data['model']:
             self.add_mesh_node(manager, scene, model, mesh_parents, layered_mesh_names)
+
+        # add debugMesh
+        for i in range(len(debugMeshs)):
+            self.add_debug_mesh_node(manager, scene, debugMeshs[i], "dg_")
 
         self.get_children(model_node, nodes, ['FbxNull', 'FbxMesh'])
 
@@ -1621,6 +1631,275 @@ class FBX:
             mesh.RemoveBadPolygons()
 
         return node
+
+
+
+
+
+
+
+
+
+    
+
+    ###################################################################################
+    ###################################################################################
+    ###################################################################################
+    ###################################################################################
+    ###################################################################################
+    ################################################################################### 
+    ###################################################################################
+    ###################################################################################
+    ###################################################################################
+    ###################################################################################
+    ###################################################################################
+
+    def add_debug_mesh_node(self, manager, scene, debugMesh, prefixName):
+
+        name = prefixName + debugMesh["name"]
+        root_node = scene.GetRootNode()
+        
+        node = fbx.FbxNode.Create(root_node, name)
+        attr = fbx.FbxNull.Create(manager, '')
+        node.AddNodeAttribute(attr)
+
+        node.LclTranslation.Set(fbx.FbxDouble3(0, 0, 0))
+        node.LclRotation.Set(fbx.FbxDouble3(0, 0, 0))
+        node.LclScaling.Set(fbx.FbxDouble3(1, 1, 1))
+        root_node.AddChild(node)
+
+        gt = node.EvaluateGlobalTransform()
+        self.bind_pose.Add(node, fbx.FbxMatrix(gt))
+
+        mesh = fbx.FbxMesh.Create(manager, f"{name}_mesh")
+        node.SetNodeAttribute(mesh)
+
+
+
+        vertices = debugMesh["vertices"]
+        faces_triangles = debugMesh["faces"]
+
+
+
+
+        #Test Todo remove (Keep first Cube)
+        # new_vertices = []
+        # new_faces_triangles = []
+        # for i in range(8):
+        #     new_vertices.append( vertices[i] )
+        # for i in range(12):
+        #     new_faces_triangles.append( faces_triangles[i] )
+        # vertices = new_vertices
+        # faces_triangles = new_faces_triangles
+
+
+
+        # ------------------------------------------------
+        # Fbx Construction
+        # ------------------------------------------------
+
+        scene = mesh.GetScene()
+
+        # Vertices
+        nbVertex = len(vertices)
+        mesh.InitControlPoints(nbVertex)
+
+        fbx_colors = []
+        fbx_normals = []
+        fbx_binormals = []
+        fbx_tangents = []
+        fbx_uvs = []
+
+        skin = None
+        fbx_boneCluster = []                        # one cluster per Bone USED
+        nbBones = 0
+        if hasattr(self, 'bone_nodes'):
+            nbBones = len(self.bone_nodes)
+            for i in range(nbBones):
+                fbx_boneCluster.append(None)
+
+
+        for i in range(nbVertex):
+            vertex = vertices[i]
+
+            if(not("color" in vertices[i])):
+                vertices[i]["color"] = []
+            if(not("normal" in vertices[i])):
+                vertices[i]["normal"] = []
+            if(not("binormal" in vertices[i])):
+                vertices[i]["binormal"] = []
+            if(not("tangent" in vertices[i])):
+                vertices[i]["tangent"] = []
+            if(not("uv" in vertices[i])):
+                vertices[i]["uv"] = []
+            if(not("blendIndices" in vertices[i])):
+                vertices[i]["blendIndices"] = []
+                vertices[i]["blendWeights"] = []
+
+            
+            # Position
+            v = fbx.FbxVector4(vertex["position"]["x"], vertex["position"]["y"], vertex["position"]["z"], vertex["position"]["w"])
+            mesh.SetControlPointAt(v, i)
+
+            # Color                 # Todo a test
+            for j in range(len(vertex["color"])):
+                color = vertex["color"][j]
+
+                if (j>=len(fbx_colors)):
+                    paramName = "color_"+ (("_"+ str(j)) if (j!=0) else "") 
+                    fbx_color = fbx.FbxLayerElementVertexColor.Create(mesh, paramName)
+                    fbx_color.SetMappingMode(fbx.FbxLayerElement.eByControlPoint)
+                    fbx_color.SetReferenceMode(fbx.FbxLayerElement.eDirect)
+                    fbx_colors.append(fbx_color)
+
+                    layer = mesh.GetLayer(j)
+                    if (not layer):
+                        mesh.CreateLayer()
+                        layer = mesh.GetLayer(j)
+                    layer.SetColors(fbx_color)
+                
+                fbx_color = fbx_colors[j]
+                fbx_color.GetDirectArray().Add(fbx.FbxVector4(color["r"], color["g"], color["b"], color["a"]))
+
+
+            # Normal
+            for j in range(len(vertex["normal"])):
+                normal = vertex["normal"][j]
+
+                if (j>=len(fbx_normals)):
+                    paramName = "normal_"+ (("_"+ str(j)) if (j!=0) else "") 
+                    fbx_normal = fbx.FbxLayerElementNormal.Create(mesh, paramName)
+                    fbx_normal.SetMappingMode(fbx.FbxLayerElement.eByControlPoint)
+                    fbx_normal.SetReferenceMode(fbx.FbxLayerElement.eDirect)
+                    fbx_normals.append(fbx_normal)
+
+                    layer = mesh.GetLayer(j)
+                    if (not layer):
+                        mesh.CreateLayer()
+                        layer = mesh.GetLayer(j)
+                    layer.SetNormals(fbx_normal)
+                
+                fbx_normal = fbx_normals[j]
+                fbx_normal.GetDirectArray().Add(fbx.FbxVector4(normal["x"], normal["y"], normal["z"], normal["w"]))
+
+            # Binormal
+            for j in range(len(vertex["binormal"])):
+                binormal = vertex["binormal"][j]
+
+                if (j>=len(fbx_binormals)):
+                    paramName = "binormal_"+ (("_"+ str(j)) if (j!=0) else "") 
+                    fbx_binormal = fbx.FbxLayerElementBinormal.Create(mesh, paramName)
+                    fbx_binormal.SetMappingMode(fbx.FbxLayerElement.eByControlPoint)
+                    fbx_binormal.SetReferenceMode(fbx.FbxLayerElement.eDirect)
+                    fbx_binormals.append(fbx_binormal)
+
+                    layer = mesh.GetLayer(j)
+                    if (not layer):
+                        mesh.CreateLayer()
+                        layer = mesh.GetLayer(j)
+                    layer.SetBinormals(fbx_binormal)
+                
+                fbx_binormal = fbx_binormals[j]
+                fbx_binormal.GetDirectArray().Add(fbx.FbxVector4(binormal["x"], binormal["y"], binormal["z"], binormal["w"]))
+            
+
+            # Tangent
+            for j in range(len(vertex["tangent"])):
+                tangent = vertex["tangent"][j]
+
+                if (j>=len(fbx_tangents)):
+                    paramName = "tangent_"+ (("_"+ str(j)) if (j!=0) else "") 
+                    fbx_tangent = fbx.FbxLayerElementTangent.Create(mesh, paramName)
+                    fbx_tangent.SetMappingMode(fbx.FbxLayerElement.eByControlPoint)
+                    fbx_tangent.SetReferenceMode(fbx.FbxLayerElement.eDirect)
+                    fbx_tangents.append(fbx_tangent)
+
+                    layer = mesh.GetLayer(j)
+                    if (not layer):
+                        mesh.CreateLayer()
+                        layer = mesh.GetLayer(j)
+                    layer.SetTangents(fbx_tangent)
+                
+                fbx_tangent = fbx_tangents[j]
+                fbx_tangent.GetDirectArray().Add(fbx.FbxVector4(tangent["x"], tangent["y"], tangent["z"], tangent["w"]))
+
+
+            # Uv
+            for j in range(len(vertex["uv"])):
+                uv = vertex["uv"][j]
+
+                if (j>=len(fbx_uvs)):
+                    paramName = "uv_"+ (("_"+ str(j)) if (j!=0) else "") 
+                    fbx_uv = fbx.FbxLayerElementUV.Create(mesh, paramName)
+                    fbx_uv.SetMappingMode(fbx.FbxLayerElement.eByControlPoint)
+                    fbx_uv.SetReferenceMode(fbx.FbxLayerElement.eDirect)
+                    fbx_uvs.append(fbx_uv)
+
+                    layer = mesh.GetLayer(j)
+                    if (not layer):
+                        mesh.CreateLayer()
+                        layer = mesh.GetLayer(j)
+                    layer.SetUVs(fbx_uv)
+                
+                fbx_uv = fbx_uvs[j]
+                fbx_uv.GetDirectArray().Add(fbx.FbxVector2(uv["u"], 1.0 - uv["v"]))
+
+
+            # Bone Blend
+            if(nbBones):
+                for j in range(len(vertex["blendIndices"])):
+                    indexBone = vertex["blendIndices"][j]
+                    weight = vertex["blendWeights"][j]
+
+                    if (indexBone>=nbBones):            # Todo Warning
+                        indexBone = 0
+                    
+
+                    if (fbx_boneCluster[indexBone] == None):
+                        cluster = fbx.FbxCluster.Create(scene, "bone_"+ str(indexBone) +"_cluster")
+                        cluster.SetLinkMode(fbx.FbxCluster.eTotalOne)
+                        bone_node = self.bone_nodes[indexBone]
+                        cluster.SetLink(bone_node)
+                        cluster.SetTransformMatrix(node.EvaluateGlobalTransform()) # Node  support the mesh
+                        cluster.SetTransformLinkMatrix(bone_node.EvaluateGlobalTransform())
+
+                        if(skin == None):
+                            skin = fbx.FbxSkin.Create(scene, "skin_"+ name)
+                            mesh.AddDeformer(skin)
+                        skin.AddCluster(cluster)
+                        fbx_boneCluster[indexBone] = cluster
+                    cluster = fbx_boneCluster[indexBone]
+
+                    cluster.AddControlPointIndex(i, weight)
+
+
+        # Faces
+        nbTriangles = len(faces_triangles)
+        for i in range(nbTriangles):
+            mesh.BeginPolygon()
+            for j in range(3):
+                mesh.AddPolygon(faces_triangles[i][j])
+            mesh.EndPolygon()
+        
+        
+        # Materials
+        lMaterialElement = fbx.FbxLayerElementNormal.Create(mesh, name)
+        lMaterialElement.SetMappingMode(fbx.FbxLayerElement.eByPolygon)
+        lMaterialElement.SetReferenceMode(fbx.FbxLayerElement.eIndexToDirect)
+        mat = self.add_material(scene, name)
+        node.AddMaterial(mat)
+        
+        return node
+
+
+
+
+
+
+
+
+
+
 
     def add_material(self, scene, material_name):
         black = fbx.FbxDouble3(0.0, 0.0, 0.0)
