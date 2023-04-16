@@ -71,7 +71,8 @@ class STPK:
                 stream.write(bytes(4032))
             else:
                 stream.write(bytes(64))
-        if self.entries[-1].get_size() == 0:
+        if (self.entries[-1].data.__class__.__name__ != 'SPRP') and \
+           (self.entries[-1].get_size() == 0):
             stream.write(bytes(16))
         self.write_data(stream)
 
@@ -139,8 +140,15 @@ class STPKEntry():
         else:
             self.data.write(stream)
 
-    def search_entries(self, entry_list, entry_class):
-        return
+    def search_entries(self, entry_list, criteria):
+        if self.data.__class__.__name__ not in ['bytes', 'bytearray']:
+            if (self.data.__class__.__name__ == criteria) or \
+                (criteria in ut.b2s_name(self.data.name)):
+                entry_list.append(self.data)
+            else:
+                self.data.search_entries(entry_list, criteria)
+
+        return entry_list
 
     def __repr__(self):
         return (

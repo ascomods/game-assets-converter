@@ -61,6 +61,23 @@ class SCNE:
         
         return stream.tell()
 
+    def load_data(self, data):
+        self.unknown0x00 = data['unknown0x00']
+        self.data_type = ut.s2b_name(data['data_type'])
+        #self.name = ut.s2b_name(data['name'])
+        #self.layer_name = ut.s2b_name(data['layer_name'])
+        #self.parent_name = ut.s2b_name(data['parent_name'])
+
+    def get_data(self):
+        data = copy.deepcopy(vars(self))
+        to_remove = ['offset', 'data_offset', 'type', 'string_table']
+        for key in to_remove:
+            del data[key]
+        for key in data.keys():
+            if data[key].__class__.__name__ == 'bytes':
+                data[key] = data[key].decode('latin-1')
+        return data
+
     def __repr__(self):
         return (
             f'\nclass: {self.__class__.__name__}\n'
@@ -90,8 +107,8 @@ class SCNE_MATERIAL:
         self.offset = stream.tell() - data_offset
         self.data_offset = data_offset
         
-        self.name_offset = ut.b2i(stream.read(4))
-        self.name = self.string_table.content[self.name_offset]
+        name_offset = ut.b2i(stream.read(4))
+        self.name = self.string_table.content[name_offset]
         self.unknown0x04 = ut.b2i(stream.read(4))
         self.material_infos_count = ut.b2i(stream.read(4))
 
@@ -106,8 +123,8 @@ class SCNE_MATERIAL:
     def write(self, stream, write_data = True):
         stream.seek(self.data_offset + self.offset)
 
-        self.name_offset = ut.search_index_dict(self.string_table.content, self.name)
-        stream.write(ut.i2b(self.name_offset))
+        name_offset = ut.search_index_dict(self.string_table.content, self.name)
+        stream.write(ut.i2b(name_offset))
         stream.write(ut.i2b(self.unknown0x04))
         self.material_infos_count = len(self.infos)
         stream.write(ut.i2b(self.material_infos_count))
@@ -118,6 +135,23 @@ class SCNE_MATERIAL:
             stream.write(struct.pack('>iii', info_name_offset, info_type_offset, info[2]))
 
         return stream.tell()
+
+    def get_data(self):
+        data = copy.deepcopy(vars(self))
+        to_remove = ['name', 'offset', 'data_offset', 'type', 
+            'string_table', 'material_infos_count']
+        for key in to_remove:
+            del data[key]
+        for key in data.keys():
+            if data[key].__class__.__name__ == 'bytes':
+                data[key] = data[key].decode('latin-1')
+        data['infos'] = []
+        for i in range(self.material_infos_count):
+            info_name, info_type, info_unknown_0x08 = self.infos[i]
+            data['infos'].append(
+                (ut.b2s_name(info_name), ut.b2s_name(info_type), info_unknown_0x08)
+            )
+        return data
 
     def __repr__(self):
         return (

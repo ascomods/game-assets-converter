@@ -75,14 +75,25 @@ class MainHandler():
     def close_action(self, observed = None, args = None):
         self.view_handler.close_window()
 
+    def sort_filter(self, filter, ext):
+        ext = ext.upper()
+        new_filter = []
+        for elt in filter:
+            if ext in elt.rsplit(' ', 1)[0]:
+                new_filter.insert(0, elt)
+            else:
+                new_filter.append(elt)
+        
+        return new_filter
+
     def select_input_action(self, observed, args):
 		# Saving last loaded FBX file into .ini
-        last = cm.settings.value("LastFbxLoaded")
-        self.fbx_path = self.view_handler. \
-            open_file_dialog('file', 'Select the FBX file', 'FBX (*.fbx)', False, last)[0]
-        if not self.fbx_path:
-            return        
-        cm.settings.setValue("LastFbxLoaded", QUrl(self.fbx_path).adjusted(QUrl.RemoveFilename).toString())
+        last = cm.settings.value("LastFolderLoaded")
+        self.input_path = self.view_handler.open_file_dialog('folder', 
+            'Select the input folder', '', False, last)
+        if not self.input_path:
+            return
+        cm.settings.setValue("LastFolderLoaded", QUrl(self.input_path).toString())
         
         # Output files
         last = cm.settings.value("LastSprSaved")
@@ -90,7 +101,7 @@ class MainHandler():
             'Save the SPR file', 'SPR (*.spr *.pak *.zpak);;All files (*.*)', False, last)[0]
         if not self.spr_path:
             return
-        cm.settings.setValue("LastSprSaved", QUrl(self.spr_path).adjusted(QUrl.RemoveFilename).toString())
+        cm.settings.setValue("LastSprSaved", QUrl(self.spr_path).toString())
 
         self.ioram_path = None
         self.vram_path = None
@@ -105,7 +116,6 @@ class MainHandler():
                 self.ioram_path = self.spr_path[:-4] + ".ioram"
                 self.vram_path = self.spr_path[:-4] + ".vram"
 
-				
         if not self.ioram_path:
             self.ioram_path = self.view_handler.open_file_dialog('save-file', 
             'Save the IORAM file', 'IORAM (*.ioram *.pak *.zpak);;All files (*.*)')[0]
@@ -120,20 +130,17 @@ class MainHandler():
 
         ext = self.spr_path.rsplit('.', 1)[1].lower()
         if (ext == 'zpak') or (ext == 'pak'):
-            fbx_dir_path = os.path.split(self.fbx_path)[0]
-            pak_path = os.path.join(fbx_dir_path, "pak_files")
-            if os.path.exists(pak_path):
-                self.view_handler.disable_elements()
-                self.view_handler.load_window('ListWindowHandler', False, 
-                    f"Other files to include in SPR {ext} file")
-                
-                self.other_files = {}
-                for path in natsorted(glob.glob(os.path.join(pak_path, "*"))):
-                    filename = os.path.basename(path)
-                    filename = re.sub('^\[\d+\]', '', filename)
-                    self.other_files[filename] = path
-                self.view_handler.set_entries('file_list_model', self.other_files.keys())
-                return
+            self.view_handler.disable_elements()
+            self.view_handler.load_window('ListWindowHandler', False, 
+                f"Files to include in {ext} files")
+            
+            self.files = {}
+            for path in natsorted(glob.glob(os.path.join(self.input_path, "*"))):
+                filename = os.path.basename(path)
+                filename = re.sub('^\[\d+\]', '', filename)
+                self.files[filename] = path
+            self.view_handler.set_entries('file_list_model', self.files.keys())
+            return
         self.import_action()
 
     def add_files_action(self, observed = None, args = None):
@@ -144,8 +151,8 @@ class MainHandler():
         for path in files:
             filename = os.path.basename(path)
             filename = re.sub('^\[\d+\]', '', filename)
-            self.other_files[filename] = path
-        self.view_handler.set_entries('file_list_model', self.other_files.keys())
+            self.files[filename] = path
+        self.view_handler.set_entries('file_list_model', self.files.keys())
     
     def import_action(self, observed = None, args = []):
         if self.view_handler.window_handler.__class__.__name__ != 'MainWindowHandler':
@@ -154,18 +161,20 @@ class MainHandler():
         self.view_handler.disable_elements()
         self.view_handler.load_window('ProgressWindowHandler')
 
-        other_files = []
+        files = []
         for filename in args:
-            other_files.append(self.other_files[filename])
-        self.run_task('ImportTask', (self.fbx_path, self.spr_path, self.ioram_path, 
-            self.vram_path, other_files))
+            files.append(self.files[filename])
+        self.run_task('ImportTask', (self.spr_path, self.ioram_path, 
+            self.vram_path, files))
 
     def export_action(self, observed, args):
         try:
             ut.empty_temp_dir()
             self.open_action()
 
-            if ('spr' in self.data.keys()) and ('ioram' in self.data.keys()) and ('vram' in self.data.keys()):
+            if (('spr_stpk' in self.data.keys()) or ('spr' in self.data.keys())) and \
+               (('ioram_stpk' in self.data.keys()) or ('ioram' in self.data.keys())) and \
+               (('vram_stpk' in self.data.keys()) or ('vram' in self.data.keys())):
                 last = cm.settings.value("LastExportFolder")
                 self.output_path = self.view_handler \
                     .open_file_dialog('folder', 'Select the destination folder', '', False, last)
@@ -202,13 +211,38 @@ class MainHandler():
     
     def open_action(self):
         try:
-            
+            base_filter = ['ZPAK (*.zpak)', 'PAK (*.pak)', 'All files (*.*)']
+
             last = cm.settings.value("LastSprLoaded")
-            spr_path = self.view_handler.open_file_dialog('file', 'Select the SPR file', \
-                'SPR (*.spr *.pak *.zpak);;All files (*.*)', False, last)[0]            
+            filter = base_filter.copy()
+            filter.insert(-1, 'SPR (*.spr)')
+            spr_path = self.view_handler.open_file_dialog('file', 'Select the SPR file',
+                ';;'.join(filter), False, last)[0]
             if spr_path :
                 cm.settings.setValue("LastSprLoaded", QUrl(spr_path).adjusted(QUrl.RemoveFilename).toString())
+                self.data['spr_stpk'] = self.get_stpk_file(spr_path)
+                if self.data['spr_stpk'] == None:
+                    del self.data['spr_stpk']
+                    stream = open(spr_path, "rb")
+                    data_tag = stream.read(4)
+                    stream.seek(0)
+                    if data_tag in cm.class_map:
+                        data_tag = cm.class_map[data_tag]
+                    name = os.path.basename(spr_path)
+                    spr_object = eval(data_tag)(ut.s2b_name(name))
+                    if spr_object == None:
+                        raise Exception('Invalid file provided')
+                    else:
+                        self.data['spr'] = spr_object
+                        self.data['spr'].read(stream, 0)
+                    stream.close()
 
+                name, ext = os.path.splitext(spr_path.lower())
+                ext = ext.replace('.', '')
+                base_filter = self.sort_filter(base_filter, ext)
+            else:
+                return
+                
             ioram_path = None
             vram_path = None
             if spr_path :
@@ -226,83 +260,36 @@ class MainHandler():
                     ioram_path = None
                 if ((vram_path) and (not os.path.exists(vram_path))) :
                     vram_path = None
-                
-            if spr_path:
-                self.data['spr_stpk'] = self.get_stpk_file(spr_path)
-                if self.data['spr_stpk'] == None:
-                    del self.data['spr_stpk']
-                    stream = open(spr_path, "rb")
-                    data_tag = stream.read(4)
-                    stream.seek(0)
-                    if data_tag in cm.class_map:
-                        data_tag = cm.class_map[data_tag]
-                    name = os.path.basename(spr_path)
-                    spr_object = eval(data_tag)(ut.s2b_name(name))
-                    if spr_object == None:
-                        raise Exception('Invalid file provided')
-                    else:
-                        self.data['spr'] = spr_object
-                        self.data['spr'].read(stream, 0)
-                    stream.close()
-                else:
-                    if cm.selected_game == 'dbrb':
-                        # RB1 nested STPK
-                        self.data['spr_stpk'] = self.data['spr_stpk'].entries[0]
-                    self.data['spr'] = self.data['spr_stpk'].search_entries([], '.spr')[0]
-            else:
-                return
 
             if ioram_path == None:
-                ioram_path = self.view_handler.open_file_dialog('file', 'Select the IORAM file', \
-                    'IORAM (*.ioram *.pak *.zpak);;All files (*.*)')[0]
+                filter = base_filter.copy()
+                filter.insert(-1,'IORAM (*.ioram)')
+                ioram_path = self.view_handler.open_file_dialog('file', 'Select the IORAM file',
+                    ';;'.join(filter))[0]
+
             if ioram_path:
                 self.data['ioram_stpk'] = self.get_stpk_file(ioram_path)
                 if self.data['ioram_stpk'] == None:
                     stream = open(ioram_path, "rb")
                     self.data['ioram'] = stream.read()
                     stream.close()
-                else:
-                    if cm.selected_game == 'dbrb':
-                        # RB1 nested STPK
-                        self.data['ioram_stpk'] = self.data['ioram_stpk'].entries[0]
-                    self.data['ioram'] = self.data['ioram_stpk'].search_entries([], '.ioram')[0].data
             else:
                 return
-            
-            vbuf_data = self.data['spr'].search_entries([], 'VBUF')
-            if len(vbuf_data) > 0:
-                ioram_stream = BytesIO(self.data['ioram'])
-
-                for entry in vbuf_data:
-                    entry.data.read_ioram(ioram_stream)
-            else:
-                raise Exception("No model info found in SPR !")
 
             if vram_path == None:
-                vram_path = self.view_handler.open_file_dialog('file', 'Select the VRAM file', \
-                    'VRAM (*.vram *.pak *.zpak);;All files (*.*)')[0]
+                filter = base_filter.copy()
+                filter.insert(-1,'VRAM (*.vram)')
+                vram_path = self.view_handler.open_file_dialog('file', 'Select the VRAM file',
+                    ';;'.join(filter))[0]
+
             if vram_path:
                 self.data['vram_stpk'] = self.get_stpk_file(vram_path)
                 if self.data['vram_stpk'] == None:
                     stream = open(vram_path, "rb")
                     self.data['vram'] = stream.read()
                     stream.close()
-                else:
-                    if cm.selected_game == 'dbrb':
-                        # RB1 nested STPK
-                        self.data['vram_stpk'] = self.data['vram_stpk'].entries[0]
-                    self.data['vram'] = self.data['vram_stpk'].search_entries([], '.vram')[0].data
             else:
                 return
-
-            tx2d_data = self.data['spr'].search_entries([], 'TX2D')
-            if len(tx2d_data) > 0:
-                vram_stream = BytesIO(self.data['vram'])
-
-                for entry in tx2d_data:
-                    entry.data.read_vram(vram_stream)
-            else:
-                raise Exception("No texture info found in SPR !")
         except Exception as e:
             print(e)
             import traceback

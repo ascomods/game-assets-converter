@@ -8,27 +8,28 @@ from .MTRL import *
 from .SHAP import *
 from .SCNE import *
 from .BONE import *
-from .DRVN import *
-from .TXAN import *
 from .StringTable import StringTable
 
 class SPRP:
     header_size = 64
     header_entry_size = 12
 
+    ordered_types = [
+        'TX2D', 'VSHD', 'PSHD',
+        'MTRL', 'SHAP', 'VBUF',
+        'SCNE', 'ANIM', 'BONE',
+        'DRVN', 'TXAN'
+    ]
+
     def __init__(self, name, size = 0):
         self.name = name
         self.size = size
+        self.string_table = StringTable()
         self.entries = []
         self.start_offset = 0
-        self.string_table = StringTable()
+        self.ioram_data_size = 0
+        self.vram_data_size = 0
 
-        baseName, ext = os.path.splitext(name)
-        baseName = ut.b2s_name(baseName)
-        self.header_name = ut.s2b_name(f"{baseName}.xmb")
-        self.ioram_name = ut.s2b_name(f"{baseName}.ioram")
-        self.vram_name = ut.s2b_name(f"{baseName}.vram")
-    
     def get_size(self):
         return self.size
 
@@ -56,9 +57,18 @@ class SPRP:
         self.string_table.offset = string_table_offset
         self.string_table.read(stream, string_table_size, 1)
 
-        self.header_name = self.string_table.content[header_name_offset]
-        self.ioram_name = self.string_table.content[ioram_name_offset]
-        self.vram_name = self.string_table.content[vram_name_offset]
+        try:
+            self.header_name = self.string_table.content[header_name_offset]
+        except:
+            self.header_name = ''
+        try:
+            self.ioram_name = self.string_table.content[ioram_name_offset]
+        except:
+            self.ioram_name = ''
+        try:
+            self.vram_name = self.string_table.content[vram_name_offset]
+        except:
+            self.vram_name = ''
 
         self.info_offset = string_table_offset + string_table_size
         data_offset = self.info_offset + self.data_info_size
@@ -78,10 +88,19 @@ class SPRP:
         stream.write(ut.i2b(1, 2)) # write unknown bytes
         stream.write(ut.i2b(len(self.entries)))
         stream.write(bytes(4))
-        
-        header_name_offset = ut.search_index_dict(self.string_table.content, self.header_name)
-        ioram_name_offset = ut.search_index_dict(self.string_table.content, self.ioram_name)
-        vram_name_offset = ut.search_index_dict(self.string_table.content, self.vram_name)
+
+        try:
+            header_name_offset = ut.search_index_dict(self.string_table.content, self.header_name)
+        except:
+            header_name_offset = 0
+        try:
+            ioram_name_offset = ut.search_index_dict(self.string_table.content, self.ioram_name)
+        except:
+            ioram_name_offset = 0
+        try:
+            vram_name_offset = ut.search_index_dict(self.string_table.content, self.vram_name)
+        except:
+            vram_name_offset = 0
 
         stream.write(ut.i2b(header_name_offset))
         stream.write(ut.i2b(len(self.entries) * self.header_entry_size))
@@ -228,8 +247,32 @@ class SPRPEntry:
                      'data_offset', 'info_offset', 'data_count']
         for key in to_remove:
             del data[key]
+        
         for entry in self.entries:
-            data[ut.b2s_name(entry.name)] = entry.get_data()
+            name = ut.b2s_name(entry.name)
+
+            i = 0
+            found = False
+            for key in data.keys():
+                if (name == key) or ((name in key) and ('|#|' in key)):
+                    found = True
+                    break
+
+            if found:
+                if '|#|' not in key:
+                    new_name = f"0|#|{name}"
+                    data[new_name] = data[name]
+                    del data[name]
+                else:
+                    i = int(key.rsplit('|#|')[0]) + 1
+                    new_name = f"{i}|#|{name}"
+
+                while new_name in data.keys():
+                    i += 1
+                    new_name = f"{i}|#|{name}"
+                data[new_name] = entry.get_data()
+            else:
+                data[name] = entry.get_data()
         
         return data
 
@@ -269,17 +312,17 @@ class SPRPDataEntry:
         size = 0
         if include_children:
             for child in self.children:
-                if child.__class__.__name__ == self.__class__.__name__:
-                    child_size = child.get_size(include_children)
-                else:
-                    child_size = child.get_size()
+                child_size = child.get_size(include_children)
                 size += child_size
                 if add_gap:
                     size += self.info_entry_size
         
         if hasattr(self, 'data'):
             if (self.data.__class__.__name__ != 'bytes'):
-                size += self.data.get_size()
+                if self.data.__class__.__name__ == 'VBUF':
+                    size += self.data.get_size(include_children)
+                else:
+                    size += self.data.get_size()
             else:
                 size += len(self.data)
         return size
@@ -300,9 +343,9 @@ class SPRPDataEntry:
 
         try:
             if self.type == b'SCNE':
-                if b'|model' in self.name:
+                if len(self.name.rsplit(b'|')) > 1:
                     data_object = SCNE('', b'', self.string_table)
-                elif b'[MATERIAL]' in self.name:
+                elif b'[MATERIAL]' == self.name:
                     data_object = SCNE_MATERIAL('', b'', self.string_table)
                 elif b'DbzEyeInfo' in self.name:
                     data_object = SCNE_EYE_INFO('', b'', self.string_table, self.size)
@@ -310,14 +353,14 @@ class SPRPDataEntry:
                 self.name = ut.format_jap_name(self.name)
                 data_object = TX2D('', self.name, self.string_table)
             elif self.type == b'MTRL':
-                if b'DbzCharMtrl' in self.name:
+                if b'Dbz' in self.name:
                     data_object = MTRL_PROP('', self.name, self.string_table)
                 else:
                     data_object = MTRL('', self.name, self.string_table)
             elif self.type == b'SHAP':
                 data_object = SHAP('', self.name, self.string_table)
             elif self.type == b'BONE':
-                if self.name in [b'BONE_NULL', b'NULL']:
+                if b'NULL' in self.name:
                     data_object = BONE('', self.name)
                 elif self.name == b'DbzBoneInfo':
                     data_object = BONE_INFO('', b'', self.size)
@@ -342,7 +385,7 @@ class SPRPDataEntry:
                 try:
                     child_class = ut.b2s_name(self.type)
                     if child_class not in ['BONE', 'SCNE']:
-                        if name not in [b'DbzCharMtrl', b'DbzEdgeInfo', b'DbzShapeInfo']:
+                        if b'Dbz' not in name:
                             child_object = eval(child_class)(self.type, name, self.string_table)
                         else:
                             raise Exception()
@@ -429,10 +472,34 @@ class SPRPDataEntry:
             else:
                 data['data'] = self.data.decode('latin-1')
         if len(self.children) > 0:
-            data['children'] = []
+            data['children'] = {}
+
             for child in self.children:
-                data['children'].append(child.get_data())
-        
+                name = ut.b2s_name(child.name)
+
+                i = 0
+                found = False
+                for key in data['children'].keys():
+                    if (name == key) or ((name in key) and ('|#|' in key)):
+                        found = True
+                        break
+
+                if found:
+                    if '|#|' not in key:
+                        new_name = f"0|#|{name}"
+                        data['children'][new_name] = data['children'][name]
+                        del data['children'][name]
+                    else:
+                        i = int(key.rsplit('|#|')[0]) + 1
+                        new_name = f"{i}|#|{name}"
+
+                    while new_name in data['children'].keys():
+                        i += 1
+                        new_name = f"{i}|#|{name}"
+                    data['children'][new_name] = child.get_data()
+                else:
+                    data['children'][name] = child.get_data()
+
         return data
 
     def search_entries(self, entry_list, criteria):
@@ -445,14 +512,12 @@ class SPRPDataEntry:
                 entry_list.append(self)
             elif (self.data.__class__.__name__ == self.__class__.__name__):
                 entry_list = self.data.search_entries(entry_list, criteria)
-
-        if criteria != 'SHAP':
-            for child in self.children:
-                if (child.__class__.__name__ == criteria) or (ut.b2s_name(child.name) == criteria):
-                    entry_list.append(child)
-                if (child.__class__.__name__ == self.__class__.__name__):
-                    entry_list = child.search_entries(entry_list, criteria)
-
+        for child in self.children:
+            if (child.__class__.__name__ == criteria) or (ut.b2s_name(child.name) == criteria):
+                entry_list.append(child)
+            if (child.__class__.__name__ == self.__class__.__name__):
+                entry_list = child.search_entries(entry_list, criteria)
+        
         return entry_list
 
     def sort(self, reverse = False):

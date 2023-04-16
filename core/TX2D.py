@@ -67,7 +67,7 @@ class TX2D:
             return 'DXT5'
         elif self.texture_type == 0: # r8g8b8a8_typeless
             return '27'
-        return '0'
+        return 'DXT1'
 
     def get_swizzled_vram_data(self):
         data = self.vram_data

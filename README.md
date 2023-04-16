@@ -13,6 +13,7 @@ Game Compatibility List (PS3 | XBOX 360):
 ```
 DragonBall Raging Blast 1
 DragonBall Raging Blast 2
+DragonBall Ultimate Tenkaichi
 ```
 
 Credits to revel8n, adsl14, SamuelDoesStuff, HiroTex, Olganix and to the rest of the RB modding community for their contributions.

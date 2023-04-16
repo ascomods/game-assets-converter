@@ -65,13 +65,9 @@ class FBX:
         
         root_node = scene.GetRootNode()
         nodes = []
-        self.get_children(root_node, nodes, ['FbxNull', 'FbxSkeleton'])
-        
-        # BONES
-        self.bone_nodes = {0: root_node.GetChild(0)}
-        self.bone_names = {0: root_node.GetChild(0).GetName()}
-        
-        # Add orphan bones to parent
+        self.get_children(root_node, nodes, ['FbxNull', 'FbxSkeleton', 'FbxMesh'])
+
+        # Add orphan nodes to parent
         node_dict = {}
         for node in nodes:
             name = node.GetName()
@@ -83,35 +79,51 @@ class FBX:
                         node_dict[parent_name].AddChild(node)
 
         nodes = []
+        null_node = None
         for i in range(root_node.GetChildCount()):
             null_node = root_node.GetChild(i)
             if 'NULL' in null_node.GetName():
                 break
-        self.get_children(null_node, nodes, ['FbxNull', 'FbxSkeleton'])
-
-        index = 0
-        for node in nodes:
-            if node.GetName() != self.bone_names[0]:
-                if node.GetName() not in self.bone_names.values():
-                    index += 1
-                    self.bone_nodes[index] = node
-                    self.bone_names[index] = node.GetName()
             else:
-                self.bone_nodes[0] = node
-                self.bone_names[0] = node.GetName()
+                null_node = None
+
+        if null_node != None:
+        # BONES
+            self.bone_nodes = {0: null_node}
+            self.bone_names = {0: null_node.GetName()}
+            self.get_children(null_node, nodes, ['FbxNull', 'FbxSkeleton'])
+
+            index = 0
+            for node in nodes:
+                if node.GetName() != self.bone_names[0]:
+                    if node.GetName() not in self.bone_names.values():
+                        index += 1
+                        self.bone_nodes[index] = node
+                        self.bone_names[index] = node.GetName()
+                else:
+                    self.bone_nodes[0] = node
+                    self.bone_names[0] = node.GetName()
+        else:
+            print('No bone data found in FBX file. Check if NULL bone is present in the scene.')
+
+        base_nodes = []
+        for i in range(root_node.GetChildCount()):
+            base_node = root_node.GetChild(i)
+            if 'NULL' not in base_node.GetName():
+                base_nodes.append(base_node)
 
         nodes = []
-        for i in range(root_node.GetChildCount()):
-            model_node = root_node.GetChild(i)
-            if 'model' in model_node.GetName():
-                break
-        self.get_children(model_node, nodes, ['FbxNull', 'FbxMesh'])
+        for base_node in base_nodes:
+            child_nodes = []
+            self.get_children(base_node, nodes, ['FbxNull', 'FbxMesh'])
+            nodes.extend(child_nodes)
 
         self.mesh_data = {}
         self.mesh_nodes = {}
+        self.other_nodes = {}
         for node in nodes:
+            name = node.GetName()
             if node.GetMesh():
-                name = node.GetName()
 
                 # Fix for chars with duplicated parts using "face_" in material
                 material_name = name.rsplit(':')[-1]
@@ -135,6 +147,9 @@ class FBX:
 
                 self.mesh_data[name] = self.get_mesh_data(node, path)
                 self.mesh_nodes[name] = node
+            else:
+                if node.GetChildCount() == 0:
+                    self.other_nodes[name] = node
 
     def save(self, path):
         if not os.path.exists(path):
@@ -143,7 +158,7 @@ class FBX:
 
         (fbx_manager, scene) = FbxCommon.InitializeSdkObjects()
         
-        self.handle_data(fbx_manager, scene, path)
+        self.handle_data(fbx_manager, scene)
         if not self.debug_mode:
             fbx_manager.GetIOSettings().SetIntProp(fbx.EXP_FBX_COMPRESS_LEVEL, 9)
         FbxCommon.SaveScene(fbx_manager, scene, "output.fbx", 0)
@@ -158,38 +173,7 @@ class FBX:
 
         return
 
-    def handle_data(self, manager, scene, path):
-        remaining = []
-        for texture in self.data['texture']:
-            name, ext = os.path.splitext(ut.b2s_name(texture.name))
-            
-            texture_data = texture.data
-            vram_data = texture_data.get_unswizzled_vram_data()
-            output_class = texture_data.get_output_format()
-            if output_class == 'BMP':
-                output_object = BMP(name, texture_data.width, texture_data.height, vram_data)
-                output_object.save(path)
-            elif output_class == 'DDS':
-                output_object = DDS(name, texture_data.width, texture_data.height, vram_data, \
-                    texture_data.get_texture_type(), texture_data.mipmap_count)
-                output_object.save(path)
-            remaining.append(output_object.get_name())
-
-        # Assigning textures to materials
-        # Using first eyeball texture until a proper fix for eyes is implemented
-        eyeball_count = 1
-        for material in self.data['material']:
-            if not isinstance(material.data, bytes):
-                material.data.sort()
-                for layer in material.data.layers:
-                    layer_base_name = layer[1].rsplit(b'.', 1)[0]
-                    layer_base_name = layer_base_name.replace(b'.', b'')
-                    if b'eyeball' in layer_base_name:
-                        layer_base_name = re.split(b'\d+$', layer_base_name, 0)[0]
-                        layer_base_name += ut.s2b_name(f".{eyeball_count}")
-                    matches = difflib.get_close_matches(ut.b2s_name(layer_base_name), remaining, len(remaining), 0)
-                    layer[1] = ut.s2b_name(matches[0])
-
+    def handle_data(self, manager, scene):
         root_node = scene.GetRootNode()
         parent_node = root_node
 
@@ -466,8 +450,25 @@ class FBX:
                 vertices[i]['blend_weights'].append(blend['weight'])
 
         faces_triangles = []
-        for i in range(mesh.GetPolygonCount()):
-            faces_triangles.append( [mesh.GetPolygonVertex(i, 0), mesh.GetPolygonVertex(i, 1), mesh.GetPolygonVertex(i, 2)])
+        if cm.selected_game == 'dbut':
+            # Keeping only one instance of each vertex
+            new_vertices = []
+            for vertex in vertices:
+                if vertex not in new_vertices:
+                    new_vertices.append(vertex)
+            
+            for i in range(mesh.GetPolygonCount()):
+                idx = mesh.GetPolygonVertex(i, 0)
+                idx1 = mesh.GetPolygonVertex(i, 1)
+                idx2 = mesh.GetPolygonVertex(i, 2)
+
+                faces_triangles.append([new_vertices.index(vertices[idx]),
+                                        new_vertices.index(vertices[idx1]),
+                                        new_vertices.index(vertices[idx2])])
+            vertices = new_vertices
+        else:
+            for i in range(mesh.GetPolygonCount()):
+                faces_triangles.append( [mesh.GetPolygonVertex(i, 0), mesh.GetPolygonVertex(i, 1), mesh.GetPolygonVertex(i, 2)])
 
         if self.debug_mode:
             self.create_mesh_debug_xml("10_ImportedFromFbx", name.replace(":", "_"), vertices, faces_triangles)
@@ -506,24 +507,26 @@ class FBX:
 
         # -------------------------------------------------------------------------------------------------------------
         # Apply Triangle Strip  on Vertex (Game's logic  / bad logic : they don't have faceIndex, but duplicate Vertex)
+        # RB uses duplicate vertices while UT uses face indices
         # -------------------------------------------------------------------------------------------------------------
 
-        new_vertices = []
-        for i in range(len(strip_indices)):
-            new_vertices.append(vertices[strip_indices[i]])
+        if cm.selected_game in ['dbrb', 'dbrb2']:
+            new_vertices = []
+            for i in range(len(strip_indices)):
+                new_vertices.append(vertices[strip_indices[i]])
 
-        new_faces_triangles = []
-        for i in range(len(new_vertices) - 2):
-            # Triangle strips logic
-            if (i % 2 == 0):
-                new_faces_triangles.append([i, i + 1, i + 2])
-            else:
-                new_faces_triangles.append([i, i + 2, i + 1])
-        
-        vertices = new_vertices
-        faces_triangles = new_faces_triangles
-        if self.debug_mode:
-            self.create_mesh_debug_xml("12_TriangleStripOnVertex", name.replace(":", "_"), vertices, faces_triangles)
+            new_faces_triangles = []
+            for i in range(len(new_vertices) - 2):
+                # Triangle strips logic
+                if (i % 2 == 0):
+                    new_faces_triangles.append([i, i + 1, i + 2])
+                else:
+                    new_faces_triangles.append([i, i + 2, i + 1])
+            
+            vertices = new_vertices
+            faces_triangles = new_faces_triangles
+            if self.debug_mode:
+                self.create_mesh_debug_xml("12_TriangleStripOnVertex", name.replace(":", "_"), vertices, faces_triangles)
 
         # ------------------------------------------------ 
         # Fill internal data for building spr
@@ -571,6 +574,8 @@ class FBX:
                         filename = os.path.join(os.path.dirname(path), filename)
                     data['materials'].append((texture.GetName(), filename))
 
+        if cm.selected_game == 'dbut':
+            data['face_indices'] = strip_indices
         data = {k: v for k, v in data.items() if v != []}
 
         return data
@@ -978,8 +983,20 @@ class FBX:
         else:
             material_name = material_name_parts[1]
         
+        found = self.assign_material(scene, node, material_name)
+        if not found and ':' in material_name:
+            self.assign_material(scene, node, material_name_parts[-1])
+    
+        node.SetShadingMode(fbx.FbxNode.eTextureShading)
+        if self.use_fbx_face_optimisation:
+            mesh.RemoveBadPolygons()
+
+        return node
+
+    def assign_material(self, scene, node, material_name):
         for material in self.data['material']:
-            if ut.b2s_name(material.name) == material_name:
+            if (ut.b2s_name(material.name) == material_name) or \
+               (material_name in ut.b2s_name(material.name)):
                 material.data.sort()
                 mat = self.add_material(scene, material_name)
 
@@ -991,13 +1008,8 @@ class FBX:
                     layer = material.data.layers[i]
                     texture = self.add_texture(scene, layer[0], layer[1])
                     layered_texture.ConnectSrcObject(texture)
-                break
-    
-        node.SetShadingMode(fbx.FbxNode.eTextureShading)
-        if self.use_fbx_face_optimisation:
-            mesh.RemoveBadPolygons()
-
-        return node
+                return True
+        return False
 
     def add_material(self, scene, material_name):
         black = fbx.FbxDouble3(0.0, 0.0, 0.0)

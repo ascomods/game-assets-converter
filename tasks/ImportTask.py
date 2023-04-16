@@ -25,230 +25,91 @@ import core.common as cm
 class ImportTask(Task):
     version_from_vertices_list = True
 
-    def __init__(self, data, input_path, spr_path, ioram_path, vram_path, other_files):
+    def __init__(self, data, spr_path, ioram_path, vram_path, files):
         super().__init__()
         self.data = data
-        self.input_path = input_path
         self.spr_path = spr_path
         self.ioram_path = ioram_path
         self.vram_path = vram_path
-        self.other_files = other_files
+        self.files = files
 
     def run(self):
         try:
-            ut.empty_temp_dir()
-            ut.init_temp_dir()
+            stpk_name, stpk_ext = \
+                os.path.splitext(os.path.basename(self.spr_path))
 
+            for path in self.files:
+                name = os.path.basename(path)
+                name = re.sub('^\[\d+\]', '', name)
+                if os.path.isdir(path) and '.spr' in path:
+                    self.import_spr(name.rsplit('.', 1)[0], path)
+                else:
+                    if 'spr_stpk' not in self.data.keys():
+                        self.data['spr_stpk'] = \
+                            STPK(ut.s2b_name(f"{stpk_name}.pak"), 0, False)
+                    stream = open(path, 'rb')
+                    self.data['spr_stpk'].add_entry(name, stream.read())
+                    stream.close()
+
+            if 'spr_stpk' in self.data.keys():
+                self.write_and_move_pak('spr_stpk', self.spr_path)
+                self.write_and_move_pak('ioram_stpk', self.ioram_path)
+                self.write_and_move_pak('vram_stpk', self.vram_path)
+            else:
+                self.save_file('spr', self.spr_path)
+                self.save_file('ioram', self.ioram_path, True)
+                self.save_file('vram', self.vram_path, True)
+
+            self.result_signal.emit(self.__class__.__name__)
+            self.finish_signal.emit()
+        except Exception as e:
+            print(e)
+            import traceback
+            traceback.print_exc()
+
+    def import_spr(self, base_name, spr_folder_path):
+        self.send_progress(0)
+
+        ut.empty_temp_dir()
+        ut.init_temp_dir()
+
+        fbx_found = True
+        if not os.path.exists(os.path.join(spr_folder_path, "output.fbx")):
+            print(
+                f"output.fbx is missing in: {spr_folder_path}\n"
+                f"No model data will be imported back for this folder."
+            )
+            fbx_found = False
+
+        if fbx_found:
             fbx_object = FBX()
-            fbx_object.load(self.input_path)
+            fbx_object.load(os.path.join(spr_folder_path, "output.fbx"))
 
-            fbx_name = os.path.basename(self.input_path).rsplit('.', 1)[0]
-            spr_name = os.path.basename(self.spr_path).rsplit('.', 1)[0]
-            ioram_name = os.path.basename(self.ioram_path).rsplit('.', 1)[0]
-            vram_name = os.path.basename(self.vram_path).rsplit('.', 1)[0]
+        string_list = []
+        spr_object = SPRP(ut.s2b_name(f"{base_name}.spr"))
+        spr_object.header_name = ut.s2b_name(f"{base_name}.xmb")
+        spr_object.vram_name = ut.s2b_name(f"{base_name}.vram")
+        string_list.extend([spr_object.header_name, spr_object.vram_name])
+        if fbx_found:
+            spr_object.ioram_name = ut.s2b_name(f"{base_name}.ioram")
+            string_list.append(spr_object.ioram_name)
 
-            string_list = []
-            spr_object = SPRP(ut.s2b_name(f"{spr_name}.spr"))
-            spr_object.header_name = ut.s2b_name(f"{fbx_name}.xmb")
-            spr_object.ioram_name = ut.s2b_name(f"{ioram_name}.ioram")
-            spr_object.vram_name = ut.s2b_name(f"{vram_name}.vram")
-            string_list.extend([spr_object.header_name, spr_object.ioram_name, spr_object.vram_name])
-
-            spr = {
-                'TX2D': SPRPEntry(spr_object.string_table, b'TX2D'),
-                'MTRL': SPRPEntry(spr_object.string_table, b'MTRL'),
-                'SHAP': SPRPEntry(spr_object.string_table, b'SHAP'),
-                'VBUF': SPRPEntry(spr_object.string_table, b'VBUF'),
-                'SCNE': SPRPEntry(spr_object.string_table, b'SCNE'),
-                'BONE': SPRPEntry(spr_object.string_table, b'BONE'),
-                'DRVN': SPRPEntry(spr_object.string_table, b'DRVN'),
-                'TXAN': SPRPEntry(spr_object.string_table, b'TXAN')
-            }
-
-            # Load data from JSON files
-            try:
-                path = os.path.join(os.path.dirname(self.input_path), "MTRL.json")
-                stream = open(path, "r")
-                mtrl_dict = json.load(stream)
+        spr = {}
+        loaded_dict = {}
+        for filename in os.listdir(spr_folder_path):
+            name, ext = os.path.splitext(filename)
+            if ext.lower() == '.json':
+                stream = open(os.path.join(spr_folder_path, filename), "r")
+                loaded_dict[name] = json.load(stream)
                 stream.close()
-            except:
-                mtrl_dict = {}
 
-            try:
-                path = os.path.join(os.path.dirname(self.input_path), "SHAP.json")
-                stream = open(path, "r")
-                shap_dict = json.load(stream)
-                stream.close()
-            except:
-                shap_dict = {}
+        self.send_progress(20)
 
-            try:
-                path = os.path.join(os.path.dirname(self.input_path), "VBUF.json")
-                stream = open(path, "r")
-                vbuf_dict = json.load(stream)
-                stream.close()
-            except:
-                vbuf_dict = {}
-
-            try:
-                path = os.path.join(os.path.dirname(self.input_path), "SCNE.json")
-                stream = open(path, "r")
-                scne_dict = json.load(stream)
-                stream.close()
-            except:
-                scne_dict = {}
-
-            try:
-                path = os.path.join(os.path.dirname(self.input_path), "BONE.json")
-                stream = open(path, "r")
-                loaded_bone_dict = json.load(stream)
-                stream.close()
-            except:
-                loaded_bone_dict = {}
-
-            try:
-                path = os.path.join(os.path.dirname(self.input_path), "DRVN.json")
-                stream = open(path, "r")
-                drvn_dict = json.load(stream)
-                stream.close()
-            except:
-                drvn_dict = {}
-
-            try:
-                path = os.path.join(os.path.dirname(self.input_path), "TXAN.json")
-                stream = open(path, "r")
-                txan_dict = json.load(stream)
-                stream.close()
-            except:
-                txan_dict = {}
-
-            self.send_progress(10)
-
+        if fbx_found:
             # Bones
-            bone_object = BONE()
-            bone_names = []
-            bone_dict = {}
-
-            for node in fbx_object.bone_nodes.values():
-                bone_entry_object = BONE_DATA(bone_object.bone_string_table)
-                bone_entry_object.name = ut.s2b_name(node.GetName())
-                bone_names.append(bone_entry_object.name)
-                
-                gt = node.EvaluateGlobalTransform()
-                it = node.EvaluateGlobalTransform().Inverse()
-                lt = node.EvaluateLocalTransform()
-
-                bone_entry_object.abs_transform = np.array([
-                    tuple(gt.GetRow(0)),
-                    tuple(gt.GetRow(1)),
-                    tuple(gt.GetRow(2)),
-                    tuple(gt.GetRow(3))
-                ]).transpose()
-
-                bone_entry_object.inv_transform = np.array([
-                    tuple(it.GetRow(0)),
-                    tuple(it.GetRow(1)),
-                    tuple(it.GetRow(2)),
-                    tuple(it.GetRow(3))
-                ]).transpose()
-
-                bone_entry_object.rel_transform = np.array([
-                    tuple(lt.GetRow(0)),
-                    tuple(lt.GetRow(1)),
-                    tuple(lt.GetRow(2)),
-                    tuple(lt.GetRow(3))
-                ]).transpose()
-
-                try:
-                    bone_entry_object.transform1 = \
-                        np.array(loaded_bone_dict[node.GetName()]['data']['transform1'])
-                    bone_entry_object.transform2 = \
-                        np.array(loaded_bone_dict[node.GetName()]['data']['transform2'])
-                except:
-                    pass
-
-                bone_object.bone_entries.append(bone_entry_object)
-                bone_dict[bone_entry_object.name] = bone_entry_object
-
-            processed_bones = [ut.s2b_name(fbx_object.bone_names[0])]
-            for node in fbx_object.bone_nodes.values():
-                bone_name = ut.s2b_name(node.GetName())
-                child_names = []
-                
-                for i in range(node.GetChildCount()):
-                    child_name = ut.s2b_name(node.GetChild(i).GetName())
-                    child_names.append(child_name)
-                    if child_name not in processed_bones:
-                        processed_bones.append(child_name)
-
-                for bone in bone_object.bone_entries:
-                    if bone.name == bone_name:
-                        for child in bone_object.bone_entries:
-                            if child.name in child_names:
-                                bone.children.append(child)
+            if hasattr(fbx_object, 'bone_nodes'):
+                self.build_bones(spr, spr_object, fbx_object, loaded_dict, string_list)
             
-            # Bone merging if multiple armatures
-            remaining_bones = list(set(bone_names) - set(processed_bones))
-            for bone_name in remaining_bones:
-                idx = ut.search_index_dict(fbx_object.bone_names, ut.b2s_name(bone_name))
-                node = fbx_object.bone_nodes[idx]
-                bone = bone_dict[bone_name]
-                parent_name = ut.s2b_name(node.GetParent().GetName())
-                if parent_name != b'RootNode':
-                    parentBone = bone_dict[parent_name]
-                    parentBone.children.append(bone)
-
-            bone_object.bone_string_table.build(bone_names)
-            bone_object.sort_bones()
-            string_list.append(bone_object.bone_entries[0].name)
-            spr_data_entry = SPRPDataEntry(b'BONE', bone_object.bone_entries[0].name, spr_object.string_table, True)
-            spr_data_entry.data = bone_object
-
-            string_list.append(b'DbzBoneInfo')
-            bone_info_object = BONE_INFO()
-
-            try:
-                first_bone_dict = list(loaded_bone_dict.values())[0]
-                bone_char_info_name = list(first_bone_dict.keys())[2]
-                string_list.append(ut.s2b_name(bone_char_info_name))
-                bone_char_info_object = BONE_INFO()
-                bone_char_info_object.info_size = 20
-            except Exception as e:
-                pass
-
-            new_bone_info_dict = {}
-            new_bone_char_info_dict = {}
-            for bone in bone_object.bone_entries:
-                try:
-                    new_bone_info_dict[ut.b2s_name(bone.name)] = \
-                        loaded_bone_dict[ut.b2s_name(bone.name)]['DbzBoneInfo']
-                except:
-                    new_bone_info_dict[ut.b2s_name(bone.name)] = {
-                        'unknown0x00': "\u0000\u0000\u0000\u0000",
-                        'data': [ 0.0, 0.0, 0.0,
-                                  0.0, 0.0, 0.0,
-                                  0.0, 0.0, 0.0 ]
-                    }
-                try:
-                    new_bone_char_info_dict[ut.b2s_name(bone.name)] = \
-                        loaded_bone_dict[ut.b2s_name(bone.name)][bone_char_info_name]
-                except:
-                    pass
-
-            bone_info_object.load_data(new_bone_info_dict)
-            spr_child_data_entry = SPRPDataEntry(b'BONE', b'DbzBoneInfo', spr_object.string_table)
-            spr_child_data_entry.data = bone_info_object
-            spr_data_entry.children.append(spr_child_data_entry)
-
-            if new_bone_char_info_dict != {}:
-                bone_char_info_object.load_data(new_bone_char_info_dict)
-                spr_child_data_entry = SPRPDataEntry(b'BONE', 
-                    ut.s2b_name(bone_char_info_name), spr_object.string_table)
-                spr_child_data_entry.data = bone_char_info_object
-                spr_data_entry.children.append(spr_child_data_entry)
-
-            spr['BONE'].entries.append(spr_data_entry)
-
             self.send_progress(30)
 
             # Meshes
@@ -355,18 +216,18 @@ class ImportTask(Task):
                                     for i in range(len(decl_data['data'])):
                                         vtx = decl_data['data'][i]
                                         decl_data['data'][i] = (vtx[0], vtx[1], vtx[2], 0.0)
-
                                 elif ((self.version_from_vertices_list) and (vtx_usage == 'uvs')):
                                     for i in range(len(decl_data['data'])):
                                         vtx = decl_data['data'][i]
                                         decl_data['data'][i] = (vtx[0], vtx[1])
-
                                 elif ((self.version_from_vertices_list) and (vtx_usage in ['bone_indices', 'bone_weights'])):
                                     for i in range(len(decl_data['data'])):
                                         decl_data['data'][i] = [decl_data['data'][i]]
 
                                 vbuf_object.data[vtx_usage].append(decl_data)
                                 index += 1
+                        elif ((cm.selected_game == 'dbut') and (vtx_usage == 'face_indices')):
+                            vbuf_object.face_indices = vtx_data_entries
                     try:
                         material_name_parts = mesh_name.rsplit(b':')
                         if len(material_name_parts) > 2:
@@ -380,10 +241,16 @@ class ImportTask(Task):
                     string_list.append(material_name)
 
                     try:
-                        mtrl_data = mtrl_dict[ut.b2s_name(material_name)]
+                        mtrl_data = loaded_dict['MTRL'][ut.b2s_name(material_name)]
                     except:
                         mtrl_data = None
                     
+                    if len(data['materials']) > 0:
+                        if 'TX2D' not in spr.keys():
+                            spr['TX2D'] = SPRPEntry(spr_object.string_table, b'TX2D')
+                        if 'MTRL' not in spr.keys():
+                            spr['MTRL'] = SPRPEntry(spr_object.string_table, b'MTRL')
+
                     # Materials
                     if material_name not in materials.keys():
                         mtrl_object = MTRL('', material_name, spr_object.string_table)
@@ -396,25 +263,16 @@ class ImportTask(Task):
                             if spr_data_entry != None:
                                 spr['TX2D'].entries.append(spr_data_entry)
                             string_list.append(layer_name)
-
-                            # name_parts = source_name.rsplit(b'.')
-                            # if len(name_parts) > 2:
-                            #     # source_name = name_parts[0]
-                            #     # if b'EYEBALL1' in material_name:
-                            #     #     source_name += ut.s2b_name('11')
-                            #     num = int(name_parts[1])
-                            #     if b'EYEBALL1' in material_name:
-                            #         num += 1
-                            #     source_name = \
-                            #         b'.'.join([name_parts[0], ut.s2b_name(str(num)), name_parts[2]])
                             string_list.append(source_name)
                             mtrl_object.layers.append((layer_name, source_name))
 
                             # Textures not in materials
-                            name_parts = layer[1].rsplit('.')
+                            folder_path, name = os.path.split(layer[1])
+                            name_parts = name.rsplit('.')
                             if len(name_parts) > 2:
                                 num = int(name_parts[1]) + 1
                                 texture_path = '.'.join([name_parts[0], str(num), name_parts[2]])
+                                texture_path = os.path.join(folder_path, texture_path)
                                 while os.path.exists(texture_path):
                                     layer_name, source_name, texture_names, spr_data_entry = \
                                         self.add_texture(spr_object, texture_names, '', texture_path)
@@ -423,22 +281,41 @@ class ImportTask(Task):
                                     string_list.append(source_name)
                                     num += 1
                                     texture_path = '.'.join([name_parts[0], str(num), name_parts[2]])
+                                    texture_path = os.path.join(folder_path, texture_path)
                         mtrl_object.sort(True)
                         
                         spr_data_entry = SPRPDataEntry(b'MTRL', material_name, spr_object.string_table, True)
                         spr_data_entry.data = mtrl_object
 
-                        string_list.append(b'DbzCharMtrl')
-                        mtrl_prop_object = MTRL_PROP('', b'DbzCharMtrl', spr_object.string_table)
+                        has_char_mtrl = False
                         if mtrl_data != None:
-                            if 'DbzCharMtrl' in mtrl_data.keys():
-                                mtrl_prop_object.load_data(mtrl_data['DbzCharMtrl'])
-                        spr_child_data_entry = SPRPDataEntry(b'MTRL', b'DbzCharMtrl', spr_object.string_table)
-                        spr_child_data_entry.data = mtrl_prop_object
-                        spr_data_entry.children.append(spr_child_data_entry)
+                            if 'children' in mtrl_data.keys():
+                                for child_name, child_data in mtrl_data['children'].items():
+                                    if child_name == 'DbzCharMtrl':
+                                        has_char_mtrl = True
+                                    string_list.append(ut.s2b_name(child_name))
+                                    mtrl_prop_object = \
+                                        MTRL_PROP('', ut.s2b_name(child_name), spr_object.string_table)
+                                    mtrl_prop_object.load_data(mtrl_data['children'][child_name])
+
+                                    spr_child_data_entry = \
+                                        SPRPDataEntry(b'MTRL', ut.s2b_name(child_name), spr_object.string_table)
+                                    spr_child_data_entry.data = mtrl_prop_object
+                                    spr_data_entry.children.append(spr_child_data_entry)
+                        
+                        if not has_char_mtrl:
+                            string_list.append(b'DbzCharMtrl')
+                            mtrl_prop_object = MTRL_PROP('', b'DbzCharMtrl', spr_object.string_table)
+                            spr_child_data_entry = \
+                                SPRPDataEntry(b'MTRL', b'DbzCharMtrl', spr_object.string_table)
+                            spr_child_data_entry.data = mtrl_prop_object
+                            spr_data_entry.children.append(spr_child_data_entry)
 
                         spr['MTRL'].entries.append(spr_data_entry)
                         materials[material_name] = spr_data_entry
+
+                    if 'SHAP' not in spr.keys():
+                        spr['SHAP'] = SPRPEntry(spr_object.string_table, b'SHAP')
 
                     # Shapes
                     try:
@@ -452,52 +329,23 @@ class ImportTask(Task):
                     string_list.append(shap_name)
 
                     try:
-                        shap_data = shap_dict[ut.b2s_name(shap_name)]
+                        shap_data = loaded_dict['SHAP'][ut.b2s_name(shap_name)]
                     except:
                         shap_data = None
 
                     if shape_name not in shapes.keys():
-                        shape_object = SHAP('', shap_name, spr_object.string_table)
-                        if shap_data:
-                            shape_object.load_data(shap_data)
-                        spr_data_entry = SPRPDataEntry(b'SHAP', shap_name, spr_object.string_table, True)
-                        spr_data_entry.data = shape_object
-
-                        string_list.append(b'DbzEdgeInfo')
-                        shape_object = SHAP('', b'DbzEdgeInfo', spr_object.string_table)
-                        if shap_data and 'DbzEdgeInfo' in shap_data.keys():
-                            shape_object.load_data(shap_data['DbzEdgeInfo'])
-                            if shape_object.source_name != b'':
-                                string_list.append(shape_object.source_name)
-                                # Add source texture if its missing
-                                if shape_object.source_name not in texture_names:
-                                    texture_name = ut.b2s_name(shape_object.source_name)
-                                    texture_path = os.path.join(os.path.dirname(self.input_path), f"*{texture_name}")
-                                    texture_path = glob.glob(texture_path)[0]
-                                    layer_name, source_name, texture_names, texture_spr_data_entry = \
-                                        self.add_texture(spr_object, texture_names, '', texture_path)
-                                    if texture_spr_data_entry != None:
-                                        spr['TX2D'].entries.append(texture_spr_data_entry)
-                            if shape_object.source_type != b'':
-                                string_list.append(shape_object.source_type)
-
-                        spr_child_data_entry = SPRPDataEntry(b'SHAP', b'DbzEdgeInfo', spr_object.string_table)
-                        spr_child_data_entry.data = shape_object
-                        spr_data_entry.children.append(spr_child_data_entry)
-
-                        string_list.append(b'DbzShapeInfo')
-                        shape_object = SHAP('', b'DbzShapeInfo', spr_object.string_table)
-                        spr_child_data_entry = SPRPDataEntry(b'SHAP', b'DbzShapeInfo', spr_object.string_table)
-                        spr_child_data_entry.data = shape_object
-                        spr_data_entry.children.append(spr_child_data_entry)
-
+                        spr_data_entry = self.build_shape(spr, spr_object, texture_names,
+                            string_list, shap_name, shap_data, spr_folder_path)
                         spr['SHAP'].entries.append(spr_data_entry)
                         shapes[shape_name] = spr_data_entry
                 except Exception as e:
                     print(mesh_name)
-                    print(e)
                     import traceback
-                    print(traceback.format_exc())
+                    traceback.print_exc()
+                    print(e)
+                
+                if 'VBUF' not in spr.keys():
+                    spr['VBUF'] = SPRPEntry(spr_object.string_table, b'VBUF')
 
                 vbuf_object.load_data()
                 if b'EYE' in mesh_name:
@@ -527,6 +375,9 @@ class ImportTask(Task):
                 fbx_object.add_node_recursively(parents, mesh_node.GetParent())
                 parents = parents[::-1]
                 parent_names = []
+
+                if 'SCNE' not in spr.keys():
+                    spr['SCNE'] = SPRPEntry(spr_object.string_table, b'SCNE')
 
                 # SCNE Transform
                 for i in range(len(parents)):
@@ -560,6 +411,8 @@ class ImportTask(Task):
                         scne_parts[full_name] = spr_data_entry
 
                 # SCNE Mesh
+                if len(parent_names) == 0:
+                    parent_names = ['']
                 scene_mesh_name  = ut.s2b_name(f"{parent_names[0]}|{ut.b2s_name(mesh_name)}")
                 if base_mesh_name != ut.b2s_name(mesh_name):
                     name = ut.b2s_name(shape_name).rsplit('|', 1)[1]
@@ -576,7 +429,8 @@ class ImportTask(Task):
                 scne_mesh_object.parent_name = scene_shape_name
 
                 # SCNE Material
-                scne_material_object = SCNE_MATERIAL('', materials[material_name].name, spr_object.string_table)
+                scne_material_object = \
+                    SCNE_MATERIAL('', materials[material_name].name, spr_object.string_table)
                 for layer in materials[material_name].data.layers:
                     if b'EYE' in mesh_name:
                         if layer[0] == b'COLORMAP0':
@@ -616,108 +470,468 @@ class ImportTask(Task):
 
             self.send_progress(60)
 
-            string_list.append(b'[LAYERS]')
-            scne_layers_entry = SPRPDataEntry(b'SCNE', b'[LAYERS]', spr_object.string_table)
-            layer_names = set(scene_layers.values())
+            # TODO: check and clean SCNE import code
 
-            for name in layer_names:
-                string_list.append(name)
-                layer_node = SPRPDataEntry(b'SCNE', name, spr_object.string_table)
-                scne_layers_entry.children.append(layer_node)
-            scne_layers_entry.sort()
+            if 'SCNE' in spr.keys():
+                string_list.append(b'[LAYERS]')
+                scne_layers_entry = SPRPDataEntry(b'SCNE', b'[LAYERS]', spr_object.string_table)
+                layer_names = set(scene_layers.values())
 
-            string_list.append(b'[NODES]')
-            scne_nodes_entry = SPRPDataEntry(b'SCNE', b'[NODES]', spr_object.string_table)
-            scne_nodes_entry.children = scne_parts.values()
-            scne_nodes_entry.sort(True)
+                for name in layer_names:
+                    string_list.append(name)
+                    layer_node = SPRPDataEntry(b'SCNE', name, spr_object.string_table)
+                    scne_layers_entry.children.append(layer_node)
+                # if '[LAYERS]' in loaded_dict['SCNE'].keys():
+                #     if 'children' in loaded_dict['SCNE']['[LAYERS]'].keys():
+                #         for key, content in loaded_dict['SCNE']['[LAYERS]']['children'].items():
+                #             key = ut.s2b_name(key)
+                #             if key not in layer_names:
+                #                 string_list.append(key)
+                #                 layer_node = SPRPDataEntry(b'SCNE', key, spr_object.string_table)
+                #                 scne_layers_entry.children.append(layer_node)
+                scne_layers_entry.sort()
 
-            if 'DbzEyeInfo' in scne_dict.keys():
-                string_list.append(b'DbzEyeInfo')
-                scne_eye_info_object = SCNE_EYE_INFO('', b'DbzEyeInfo', spr_object.string_table)
-                scne_eye_info_object.load_data(scne_dict['DbzEyeInfo'])
-                for entry in scne_eye_info_object.eye_entries:
-                    if entry.name != b'':
-                        string_list.append(entry.name)
-                scne_eye_info_entry = SPRPDataEntry(b'SCNE', b'DbzEyeInfo', spr_object.string_table)
-                scne_eye_info_entry.data = scne_eye_info_object
+                string_list.append(b'[NODES]')
+                scne_nodes_entry = SPRPDataEntry(b'SCNE', b'[NODES]', spr_object.string_table)
+                #scne_nodes_entry.children = scne_parts.values()
+                #scne_nodes_entry.sort(True)
 
-            scene_name = ut.s2b_name(f"{fbx_name}.fbx")
-            string_list.append(scene_name)
-            scne_main_entry = SPRPDataEntry(b'SCNE', scene_name, spr_object.string_table, True)
-            scne_main_entry.children.append(scne_layers_entry)
-            scne_main_entry.children.append(scne_nodes_entry)
-            if 'DbzEyeInfo' in scne_dict.keys():
-                scne_main_entry.children.append(scne_eye_info_entry)
-            spr['SCNE'].entries.append(scne_main_entry)
+                for node_name, node in fbx_object.other_nodes.items():
+                    layered_mesh_name = node_name
+                    layer_name, node_name = self.format_name(node_name, '', '')
+                    base_node_name = node_name
+                    try:
+                        node_name = node_name.rsplit('|', 1)[1]
+                    except IndexError:
+                        pass
+                    node_name = ut.s2b_name(node_name)
 
-            for name, content in drvn_dict.items():
-                name = ut.s2b_name(name)
-                string_list.append(name)
-                spr_data_entry = SPRPDataEntry(b'DRVN', name, spr_object.string_table, True)
-                spr_data_entry.data = content['data'].encode('latin-1')
-                spr['DRVN'].entries.append(spr_data_entry)
+                    try:
+                        if base_node_name != ut.b2s_name(node_name):
+                            shape_name = ut.s2b_name(base_node_name.split(':')[0])
+                        else:
+                            shape_name = node_name.split(b':')[0]
+                    except:
+                        shape_name = node_name
 
-            for name, content in txan_dict.items():
-                name = ut.s2b_name(name)
-                string_list.append(name)
-                spr_data_entry = SPRPDataEntry(b'TXAN', name, spr_object.string_table, True)
-                spr_data_entry.data = content['data'].encode('latin-1')
-                spr['TXAN'].entries.append(spr_data_entry)
+                    if layer_name != '':
+                        scene_layers[node_name] = ut.s2b_name(layer_name)
+                        string_list.append(scene_layers[node_name])
+                    
+                    parents = []
+                    fbx_object.add_node_recursively(parents, node.GetParent())
+                    parents = parents[::-1]
+                    parent_names = []
 
-            for entry in spr.values():
-                entry.sort()
-                if len(entry.entries) > 0:
+                    if 'SCNE' not in spr.keys():
+                        spr['SCNE'] = SPRPEntry(spr_object.string_table, b'SCNE')
+
+                    # SCNE Transform
+                    # for i in range(len(parents)):
+                    #     name = parents[i].GetName()
+                    #     layer_name, full_name = self.format_name(name)
+                    #     string_list.append(ut.s2b_name(layer_name))
+
+                    #     if (i + 1 < len(parents)):
+                    #         for j in range(i + 1, len(parents)):
+                    #             name = parents[j].GetName()
+                    #             layer, full_name = self.format_name(name, full_name)
+                        
+                    #     parent_names.append(full_name)
+                    #     if full_name not in scne_parts.keys():
+                    #         full_name = ut.s2b_name(full_name)
+                    #         string_list.append(full_name)
+                    #         scne_transform_object = SCNE('', b'', spr_object.string_table)
+
+                    #         if not parents[i].Show.Get():
+                    #             scne_transform_object.unknown0x00 = 3
+                    #         scne_transform_object.data_type = b'transform'
+                    #         if layer_name != '':
+                    #             layer_name = ut.s2b_name(layer_name)
+                    #             scene_layers[full_name] = layer_name
+                    #             scne_transform_object.layer_name = layer_name
+                    #         parent_name = full_name.rsplit(b'|', 1)[0]
+                    #         scne_transform_object.parent_name = parent_name
+                    #         string_list.append(b'transform')
+
+                    #         spr_data_entry = SPRPDataEntry(b'SCNE', full_name, spr_object.string_table)
+                    #         spr_data_entry.data = scne_transform_object
+                    #         scne_parts[full_name] = spr_data_entry
+
+                    # # SCNE Node
+                    # if len(parent_names) == 0:
+                    #     parent_names = ['']
+                    # scene_node_name  = ut.s2b_name(f"{parent_names[0]}|{ut.b2s_name(node_name)}")
+                    # string_list.append(node_name)
+                    # if base_node_name != ut.b2s_name(node_name):
+                    #     name = ut.b2s_name(shape_name).rsplit('|', 1)[1]
+                    #     scene_shape_name = ut.s2b_name(f"{parent_names[0]}|{name}")
+                    # else:
+                    #     scene_shape_name = ut.s2b_name(f"{parent_names[0]}|{ut.b2s_name(shape_name)}")
+                    # #scene_shape_name = ut.s2b_name(parent_names[0])
+                    # string_list.append(scene_node_name)
+                    # string_list.append(scene_shape_name)
+                    # scne_node_object = SCNE('', node_name, spr_object.string_table)
+                    # scne_node_object.data_type = b'shape'
+                    # if scene_shape_name in scene_layers.keys():
+                    #     scne_node_object.layer_name = scene_layers[node_name]
+                    # string_list.append(b'shape')
+
+                    # if parent_names != ['']:
+                    #     string_list.append(ut.s2b_name(parent_names[0]))
+                    #     scne_node_object.parent_name = ut.s2b_name(parent_names[0])
+                    # spr_data_entry = SPRPDataEntry(b'SCNE', scene_shape_name, spr_object.string_table)
+                    # spr_data_entry.data = scne_node_object
+                    # scne_parts[scene_node_name] = spr_data_entry
+
+                    # if ut.b2s_name(scene_node_name) in \
+                    #     loaded_dict['SCNE']['[NODES]']['children'].keys():
+                    #     content = loaded_dict['SCNE']['[NODES]'] \
+                    #         ['children'][ut.b2s_name(scene_node_name)]
+                    #     scne_node_object.load_data(content['data'])
+                    #     string_list.append(scne_node_object.data_type)
+
+                    #     if 'children' in content.keys():
+                    #         for key, child in content['children'].items():
+                    #             if '|#|' in key:
+                    #                 key = key.rsplit('|#|')[1]
+                    #             string_list.append(ut.s2b_name(key))
+                    #             spr_child_entry = \
+                    #                 SPRPDataEntry(b'SCNE', ut.s2b_name(key), spr_object.string_table)
+                    #             try:
+                    #                 spr_child_entry.data = child['data'].encode('latin-1')
+                    #                 spr_data_entry.children.append(spr_child_entry)
+                    #             except Exception as e:
+                    #                 print(e)
+                    #                 pass
+
+                    # if scne_node_object.data_type == b'shape':
+                    #     if shape_name not in shapes.keys():
+                    #         string_list.append(shape_name)
+                    #         spr_shape_entry = \
+                    #             self.build_shape(spr, spr_object, texture_names, string_list, shape_name)
+                    #         spr['SHAP'].entries.append(spr_shape_entry)
+                    #         shapes[shape_name] = spr_shape_entry
+
+
+                    # SCNE Shape
+                    # print(scene_shape_name)
+                    # if (scene_shape_name != b'') and (scene_shape_name not in scne_parts.keys()):
+                    #     string_list.append(shape_name)
+                    #     scne_shape_object = SCNE('', shape_name, spr_object.string_table)
+                    #     scne_shape_object.data_type = b'shape'
+                    #     if node_name in scene_layers.keys():
+                    #         scne_shape_object.layer_name = scene_layers[node_name]
+                    #     string_list.append(b'shape')
+                    #     scne_shape_object.parent_name = ut.s2b_name(parent_names[0])
+                    #     string_list.append(scne_shape_object.parent_name)
+
+                    #     spr_data_entry = SPRPDataEntry(b'SCNE', scene_shape_name, spr_object.string_table)
+                    #     spr_data_entry.data = scne_shape_object
+                    #     scne_parts[scene_shape_name] = spr_data_entry
+                    # if shape_name != b'':
+                    #     shapes[shape_name] = ''
+
+                scne_nodes_entry.children = scne_parts.values()
+                scne_nodes_entry.sort(True)
+                # if '[NODES]' in loaded_dict['SCNE'].keys():
+                #     scne_nodes = []
+                #     for key, content in loaded_dict['SCNE']['[NODES]']['children'].items():
+                #         key = ut.s2b_name(key)
+                #         if key in scne_parts.keys():
+                #             if content['data']['data_type'] != 'mesh':
+                #                 string_list.append(key)
+                #                 scne_object = scne_parts[key].data
+                #                 scne_object.load_data(content['data'])
+
+                #                 if scne_object.data_type == b'shape':
+                #                     name = scne_parts[key].data.name
+                #                     # for shape_key in shapes.keys():
+                #                     #     if shape_key in name:
+                #                     #         name = shape_key
+                #                     #         break
+                #                     if name not in shapes.keys():
+                #                         string_list.append(name)
+                #                         spr_data_entry = \
+                #                             self.build_shape(spr, spr_object, string_list, name)
+                #                         spr['SHAP'].entries.append(spr_data_entry)
+                #                         shapes[name] = spr_data_entry
+                #                 string_list.extend([scne_object.data_type, scne_object.name,
+                #                     scne_object.layer_name, scne_object.parent_name])
+                                
+                #                 spr_data_entry = scne_parts[key]
+                #                     #SPRPDataEntry(b'SCNE', key, spr_object.string_table)
+                #                 spr_data_entry.data = scne_object
+                #                 if 'children' in content.keys():
+                #                     for key, child in content['children'].items():
+                #                         if '|#|' in key:
+                #                             key = key.rsplit('|#|')[1]
+                #                         string_list.append(ut.s2b_name(key))
+                #                         spr_child_entry = \
+                #                             SPRPDataEntry(b'SCNE', ut.s2b_name(key), spr_object.string_table)
+                #                         spr_child_entry.data = child['data'].encode('latin-1')
+                #                         spr_data_entry.children.append(spr_child_entry)
+
+
+                                #scne_nodes.append(spr_data_entry)
+                    #scne_nodes_entry.children = scne_nodes + scne_nodes_entry.children
+                scene_name = ut.s2b_name(f"{base_name}.fbx")
+                string_list.append(scene_name)
+                scne_main_entry = SPRPDataEntry(b'SCNE', scene_name, spr_object.string_table, True)
+                scne_main_entry.children.append(scne_layers_entry)
+                scne_main_entry.children.append(scne_nodes_entry)
+
+                if 'DbzEyeInfo' in loaded_dict['SCNE'].keys():
+                    string_list.append(b'DbzEyeInfo')
+                    scne_eye_info_object = SCNE_EYE_INFO('', b'DbzEyeInfo', spr_object.string_table)
+                    scne_eye_info_object.load_data(loaded_dict['SCNE']['DbzEyeInfo'])
+                    del loaded_dict['SCNE']['DbzEyeInfo']
+                    for entry in scne_eye_info_object.eye_entries:
+                        if entry.name != b'':
+                            string_list.append(entry.name)
+                    scne_child_entry = SPRPDataEntry(b'SCNE', b'DbzEyeInfo', spr_object.string_table)
+                    scne_child_entry.data = scne_eye_info_object
+                    scne_main_entry.children.append(scne_child_entry)
+
+                # for key, content in loaded_dict['SCNE'].items():
+                #     if key != '[NODES]':
+                #         if '|#|' in key:
+                #             key = key.rsplit('|#|')[1]
+                #         key = ut.s2b_name(key)
+                #         string_list.append(key)
+                #         scne_child_entry = SPRPDataEntry(b'SCNE', key, spr_object.string_table)
+                #         scne_child_entry.data = content['data'].encode('latin-1')
+                #         scne_main_entry.children.append(scne_child_entry)
+
+                spr['SCNE'].entries.append(scne_main_entry)
+
+            # Other JSON files
+            for key, data in loaded_dict.items():
+                entry_type = ut.s2b_name(key)
+                if key not in spr.keys():
+                    spr[key] = SPRPEntry(spr_object.string_table, entry_type)
+                    for name, content in data.items():
+                        name = ut.s2b_name(name)
+                        string_list.append(name)
+                        spr_data_entry = \
+                            SPRPDataEntry(entry_type, name, spr_object.string_table, True)
+                        spr_data_entry.data = content['data'].encode('latin-1')
+                        spr[key].entries.append(spr_data_entry)
+        else:
+            spr = {
+                'TX2D': SPRPEntry(spr_object.string_table, b'TX2D')
+            }
+            texture_names = []
+
+            for filename in os.listdir(spr_folder_path):
+                name, ext = os.path.splitext(filename)
+                if ext.lower() in ['.bmp', '.dds']:
+                    layer_name, source_name, texture_names, spr_data_entry = \
+                        self.add_texture(spr_object, texture_names,
+                            '', os.path.join(spr_folder_path, filename))
+                    if spr_data_entry != None:
+                        spr['TX2D'].entries.append(spr_data_entry)
+            string_list.extend(texture_names)
+        
+        self.sort_entries(spr, spr_object)
+        self.build_ram_data(spr, spr_object)
+
+        # Remove duplicates from string table and build it
+        string_list = natsorted(list(set(string_list)))
+        spr_object.string_table.build(string_list, 1)
+        self.data['spr'] = spr_object
+
+        self.send_progress(80)
+
+        self.save_file('spr', self.spr_path)
+        self.save_file('ioram', self.ioram_path, True)
+        self.save_file('vram', self.vram_path, True)
+
+        if 'spr' in self.data.keys():
+            del self.data['spr']
+        if 'ioram' in self.data.keys():
+            del self.data['ioram']
+        if 'vram' in self.data.keys():
+            del self.data['vram']
+
+        self.send_progress(100)
+
+    def build_bones(self, spr_dict, spr_object, fbx_object, loaded_dict, string_list):
+        spr_dict['BONE'] = SPRPEntry(spr_object.string_table, b'BONE')
+        bone_object = BONE()
+        bone_names = []
+        bone_dict = {}
+
+        for node in fbx_object.bone_nodes.values():
+            bone_entry_object = BONE_DATA(bone_object.bone_string_table)
+            bone_entry_object.name = ut.s2b_name(node.GetName())
+            bone_names.append(bone_entry_object.name)
+            
+            gt = node.EvaluateGlobalTransform()
+            it = node.EvaluateGlobalTransform().Inverse()
+            lt = node.EvaluateLocalTransform()
+
+            bone_entry_object.abs_transform = np.array([
+                tuple(gt.GetRow(0)),
+                tuple(gt.GetRow(1)),
+                tuple(gt.GetRow(2)),
+                tuple(gt.GetRow(3))
+            ]).transpose()
+
+            bone_entry_object.inv_transform = np.array([
+                tuple(it.GetRow(0)),
+                tuple(it.GetRow(1)),
+                tuple(it.GetRow(2)),
+                tuple(it.GetRow(3))
+            ]).transpose()
+
+            bone_entry_object.rel_transform = np.array([
+                tuple(lt.GetRow(0)),
+                tuple(lt.GetRow(1)),
+                tuple(lt.GetRow(2)),
+                tuple(lt.GetRow(3))
+            ]).transpose()
+
+            try:
+                bone_entry_object.transform1 = \
+                    np.array(loaded_dict['BONE'][node.GetName()]['data']['transform1'])
+                bone_entry_object.transform2 = \
+                    np.array(loaded_dict['BONE'][node.GetName()]['data']['transform2'])
+            except:
+                pass
+
+            bone_object.bone_entries.append(bone_entry_object)
+            bone_dict[bone_entry_object.name] = bone_entry_object
+
+        processed_bones = [ut.s2b_name(fbx_object.bone_names[0])]
+        for node in fbx_object.bone_nodes.values():
+            bone_name = ut.s2b_name(node.GetName())
+            child_names = []
+            
+            for i in range(node.GetChildCount()):
+                child_name = ut.s2b_name(node.GetChild(i).GetName())
+                child_names.append(child_name)
+                if child_name not in processed_bones:
+                    processed_bones.append(child_name)
+
+            for bone in bone_object.bone_entries:
+                if bone.name == bone_name:
+                    for child in bone_object.bone_entries:
+                        if child.name in child_names:
+                            bone.children.append(child)
+        
+        # Bone merging if multiple armatures
+        remaining_bones = list(set(bone_names) - set(processed_bones))
+        for bone_name in remaining_bones:
+            idx = ut.search_index_dict(fbx_object.bone_names, ut.b2s_name(bone_name))
+            node = fbx_object.bone_nodes[idx]
+            bone = bone_dict[bone_name]
+            parent_name = ut.s2b_name(node.GetParent().GetName())
+            if parent_name != b'RootNode':
+                parentBone = bone_dict[parent_name]
+                parentBone.children.append(bone)
+
+        bone_object.bone_string_table.build(bone_names)
+        bone_object.sort_bones()
+        string_list.append(bone_object.bone_entries[0].name)
+        spr_data_entry = SPRPDataEntry(b'BONE', bone_object.bone_entries[0].name, spr_object.string_table, True)
+        spr_data_entry.data = bone_object
+
+        bone_children = {}
+        for loaded_bone_name, loaded_bone_data in loaded_dict['BONE'].items():
+            if 'children' in loaded_bone_data.keys():
+                for child_name, child_data in loaded_bone_data['children'].items():
+                    if child_name not in bone_children.keys():
+                        bone_children[child_name] = {}
+                    bone_children[child_name][loaded_bone_name] = child_data
+        
+        if 'DbzBoneInfo' not in bone_children.keys():
+            bone_children['DbzBoneInfo'] = {}
+                
+        for bone in bone_object.bone_entries:
+            if ut.b2s_name(bone.name) not in bone_children['DbzBoneInfo'].keys():
+                bone_children['DbzBoneInfo'][ut.b2s_name(bone.name)] = {
+                    'unknown0x00': "\u0000\u0000\u0000\u0000",
+                    'data': [ 0.0, 0.0, 0.0,
+                                0.0, 0.0, 0.0,
+                                0.0, 0.0, 0.0 ]
+                }
+        
+        for child_name, child_data in bone_children.items():
+            child_name = ut.s2b_name(child_name)
+            bone_child_object = BONE_INFO('', child_name)
+            if child_name != b'DbzBoneInfo':
+                bone_child_object.info_size = 20
+            string_list.append(child_name)
+            bone_child_object.load_data(child_data)
+
+            spr_child_data_entry = \
+                SPRPDataEntry(b'BONE', child_name, spr_object.string_table)
+            spr_child_data_entry.data = bone_child_object
+            spr_data_entry.children.append(spr_child_data_entry)
+
+        spr_dict['BONE'].entries.append(spr_data_entry)
+
+    def build_shape(self, spr_dict, spr_object, texture_names, string_list, shap_name, 
+                    shap_data = None, spr_folder_path = ''):
+        shape_object = SHAP('', b'', spr_object.string_table)
+        if shap_data:
+            shape_object.load_data(shap_data)
+        spr_data_entry = SPRPDataEntry(b'SHAP', shap_name, spr_object.string_table, True)
+        spr_data_entry.data = shape_object
+
+        string_list.append(b'DbzEdgeInfo')
+        shape_object = SHAP('', b'DbzEdgeInfo', spr_object.string_table)
+        if shap_data and 'DbzEdgeInfo' in shap_data.keys():
+            shape_object.load_data(shap_data['DbzEdgeInfo'])
+            if shape_object.source_name != b'':
+                string_list.append(shape_object.source_name)
+                # Add source texture if its missing
+                if shape_object.source_name not in texture_names:
+                    texture_name = ut.b2s_name(shape_object.source_name)
+                    texture_path = os.path.join(spr_folder_path, texture_name)
+                    layer_name, source_name, texture_names, texture_spr_data_entry = \
+                        self.add_texture(spr_object, texture_names, '', texture_path)
+                    if texture_spr_data_entry != None:
+                        spr_dict['TX2D'].entries.append(texture_spr_data_entry)
+            if shape_object.source_type != b'':
+                string_list.append(shape_object.source_type)
+
+        spr_child_data_entry = SPRPDataEntry(b'SHAP', b'DbzEdgeInfo', spr_object.string_table)
+        spr_child_data_entry.data = shape_object
+        spr_data_entry.children.append(spr_child_data_entry)
+
+        string_list.append(b'DbzShapeInfo')
+        shape_object = SHAP('', b'DbzShapeInfo', spr_object.string_table)
+        spr_child_data_entry = SPRPDataEntry(b'SHAP', b'DbzShapeInfo', spr_object.string_table)
+        spr_child_data_entry.data = shape_object
+        spr_data_entry.children.append(spr_child_data_entry)
+
+        return spr_data_entry
+
+    def sort_entries(self, spr_dict, spr_object):
+        # Sorting entries and removing empty ones
+        entries = {}
+        for key, entry in spr_dict.items():
+            entry.sort()
+            if len(entry.entries) > 0:
+                entries[key] = entry
+
+        for entry_type in spr_object.ordered_types:
+            for key, entry in entries.items():
+                if key == entry_type:
                     spr_object.entries.append(entry)
+                    break
+        
+        for key, entry in entries.items():
+            if key not in spr_object.ordered_types:
+                spr_object.entries.append(entry)
 
-            #Try to keep previous MTRL order
-            tmp_list = []
-            for name, content in mtrl_dict.items():
-                name = ut.s2b_name(name)
-
-                for entry in spr['MTRL'].entries:
-                    if entry.name == name:
-                        tmp_list.append(entry)
-                        spr['MTRL'].entries.remove(entry)
-                        break
-
-            for entry in spr['MTRL'].entries:
-                tmp_list.append(entry)
-            spr['MTRL'].entries = tmp_list
-
-            #Same for Shape
-            tmp_list = []
-            for name, content in shap_dict.items():
-                name = ut.s2b_name(name)
-
-                for entry in spr['SHAP'].entries:
-                    if entry.name == name:
-                        tmp_list.append(entry)
-                        spr['SHAP'].entries.remove(entry)
-                        break
-
-            for entry in spr['SHAP'].entries:
-                tmp_list.append(entry)
-            spr['SHAP'].entries = tmp_list
-
-            #Same for VBUF
-            tmp_list = []
-            for name in vbuf_dict:
-                name = ut.s2b_name(name)
-            
-                for entry in spr['VBUF'].entries:
-                    if entry.name == name:
-                        tmp_list.append(entry)
-                        spr['VBUF'].entries.remove(entry)
-                        break
-            
-            for entry in spr['VBUF'].entries:
-                tmp_list.append(entry)
-            spr['VBUF'].entries = tmp_list
-            
-
-            # Build ioram
+    def build_ram_data(self, spr_dict, spr_object):
+        # Build ioram
+        if 'VBUF' in spr_dict.keys():
             ioram_data = bytearray()
-            for entry in spr['VBUF'].entries:
+            for entry in spr_dict['VBUF'].entries:
                 vbuf_object = entry.data
 
                 data = deepcopy(vbuf_object.get_data())
@@ -728,7 +942,7 @@ class ImportTask(Task):
                             if isinstance(v, bytes):
                                 data[first_key][i][k] = ut.b2s_name(v)
                         i += 1
-
+                
                 vbuf_object.ioram_data_offset = len(ioram_data)
                 data = vbuf_object.get_ioram()
                 padding = ut.add_padding(len(data))
@@ -738,9 +952,10 @@ class ImportTask(Task):
             self.data['ioram'] = ioram_data
             spr_object.ioram_data_size = len(ioram_data)
 
-            # Build vram    
+        # Build vram
+        if 'TX2D' in spr_dict.keys():
             vram_data = bytearray()
-            for entry in spr['TX2D'].entries:
+            for entry in spr_dict['TX2D'].entries:
                 tx2d_object = entry.data
                 tx2d_object.vram_data_offset = len(vram_data)
                 data = tx2d_object.get_vram()
@@ -760,70 +975,56 @@ class ImportTask(Task):
                                 padding_lenght += 48
                             else:
                                 padding_lenght += 80
-
                 vram_data.extend(bytes(padding_lenght))
-
             self.data['vram'] = vram_data
             spr_object.vram_data_size = len(vram_data)
 
-            # Remove duplicates from string table and build it
-            string_list = natsorted(list(set(string_list)))
-            spr_object.string_table.build(string_list, 1)
-            self.data['spr'] = spr_object
+    def save_file(self, key, path, add_extra_bytes = False):
+        if key in self.data.keys():
+            if self.data[key] != None:
+                name, ext = os.path.splitext(os.path.basename(path))
+                if ext[-3:] == 'pak':
+                    stpk_key = f"{key}_stpk"
+                    if stpk_key not in self.data.keys():
+                        self.data[stpk_key] = STPK(ut.s2b_name(f"{name}.pak"), 0, add_extra_bytes)
+                    else:
+                        name, ext_2 = os.path.splitext(self.data[stpk_key].name)
 
-            self.send_progress(80)
+                    if hasattr(self.data[key], 'name'):
+                        res = self.data[stpk_key].search_entries([], ut.b2s_name(self.data[key].name))
+                        if len(res) == 0:
+                            self.data[stpk_key].add_entry(ut.b2s_name(self.data[key].name), self.data[key])
+                    elif 'spr' in self.data.keys():
+                        base_name, ext_3 = os.path.splitext(ut.b2s_name(self.data['spr'].name))
+                        res = self.data[stpk_key].search_entries([], f"{base_name}.{key}")
+                        if len(res) == 0:
+                            self.data[stpk_key].add_entry(f"{base_name}.{key}", self.data[key])
+                    else:
+                        res = self.data[stpk_key].search_entries([], f"{name}.{key}")
+                        if len(res) == 0:
+                            self.data[stpk_key].add_entry(f"{name}.{key}", self.data[key])
+                    
+                    self.write_and_move_pak(stpk_key, path)
+                else:
+                    stream = open(path, 'wb')
+                    try:
+                        self.data[key].write(stream)
+                    except Exception:
+                        stream.write(self.data[key])
+                    stream.close()
 
-            if (self.data['spr'] != None) and (self.data['ioram'] != None) and (self.data['vram'] != None):
-                self.save_file('spr', self.spr_path, self.other_files)
-                self.save_file('ioram', self.ioram_path, [], True)
-                self.save_file('vram', self.vram_path, [], True)
-            else:
-                raise Exception("Files couldn't be saved properly !")
-
-            self.send_progress(100)
-            self.result_signal.emit(self.__class__.__name__)
-            self.finish_signal.emit()
-        except Exception as e:
-            print(e)
-            import traceback
-            traceback.print_exc()
-
-    def save_file(self, key, path, other_files = [], add_extra_bytes = False):
+    def write_and_move_pak(self, stpk_key, path):
         name, ext = os.path.splitext(os.path.basename(path))
-        if ext[-3:] == 'pak':
-            stpk_key = f"{key}_stpk"
-            self.data[stpk_key] = STPK(f"{name}.pak", 0, add_extra_bytes)
+        stpk_path = os.path.join(cm.temp_path, f"{name}.pak")
+        stream = open(stpk_path, 'wb')
+        self.data[stpk_key].write(stream)
+        stream.close()
 
-            self.data[stpk_key].add_entry(f"{name}.{key}", self.data[key])
-            for other_file_path in other_files:
-                filename = os.path.basename(other_file_path)
-                filename = re.sub('^\[\d+\]', '', filename)
-                stream = open(other_file_path, 'rb')
-                self.data[stpk_key].add_entry(filename, stream.read())
-                stream.close()
-
-            if cm.selected_game == 'dbrb':
-                operate_stpk = STPK(f"{name}.pak", 0, add_extra_bytes)
-                operate_stpk.add_entry(f"op_{name}.pak", self.data[stpk_key])
-                self.data[stpk_key] = operate_stpk
-            
-            stpk_path = os.path.join(cm.temp_path, f"{name}.pak")
-            stream = open(stpk_path, 'wb')
-            self.data[stpk_key].write(stream)
-            stream.close()
-
-            if ext == '.zpak':
-                stpz_object = STPZ()
-                stpz_object.compress(path)
-            elif ext == '.pak':
-                shutil.move(stpk_path, path)
-        else:
-            stream = open(path, 'wb')
-            try:
-                self.data[key].write(stream)
-            except Exception:
-                stream.write(self.data[key])
-            stream.close()
+        if ext == '.zpak':
+            stpz_object = STPZ()
+            stpz_object.compress(stpk_path)
+        elif ext == '.pak':
+            shutil.move(stpk_path, path)
 
     def format_name(self, name, full_name = '', sep = '|'):
         layer_name = re.findall(r'^\[(.*?)\]', name)
