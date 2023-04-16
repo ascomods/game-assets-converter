@@ -9,9 +9,10 @@
 Game Assets Converter is an open-source tool that aims at converting
 some custom proprietary assets formats to the FBX format, and vice-versa.
 
-Game Compatibility List:
+Game Compatibility List (PS3 | XBOX 360):
 ```
-DragonBall Raging Blast 2 (PS3)
+DragonBall Raging Blast 1
+DragonBall Raging Blast 2
 ```
 
 Credits to revel8n, adsl14, SamuelDoesStuff, HiroTex, Olganix and to the rest of the RB modding community for their contributions.
@@ -29,6 +30,7 @@ PyQt5: 5.10.1
 QtAwesome: 1.1.0
 lxml: 4.9.2
 FBX Python SDK: 2020.2.1 (provided in the libs folder)
+Wine for linux support (tested with 8.1, might work with earlier versions)
 ```
 Install libraries using pip:
 ```

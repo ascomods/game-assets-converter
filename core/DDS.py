@@ -106,5 +106,5 @@ class DDS:
     def save(self, path):
         if not os.path.exists(path):
             os.mkdir(path)
-        stream = open(f"{path}/{self.name}{self.ext}", 'wb')
+        stream = open(os.path.join(path, self.name + self.ext), 'wb')
         self.write(stream)

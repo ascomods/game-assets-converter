@@ -8,7 +8,7 @@ class STPZ:
     def decompress(self, input_path):
         path = ut.copy_to_temp_dir(input_path)
         name, ext = os.path.splitext(os.path.basename(path))
-        stpk_path = f"{cm.temp_path}/{name}.pak"
+        stpk_path = os.path.join(cm.temp_path, name + ".pak")
         cmd.dbrb_compressor(path, stpk_path)
         
         stpk_object = STPK()
@@ -19,5 +19,5 @@ class STPZ:
 
     def compress(self, output_path):
         name, ext = os.path.splitext(os.path.basename(output_path))
-        stpk_path = f"{cm.temp_path}/{name}.pak"
+        stpk_path = os.path.join(cm.temp_path, name + ".pak")
         cmd.dbrb_compressor(stpk_path, output_path)

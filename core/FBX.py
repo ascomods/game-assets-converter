@@ -11,6 +11,7 @@ import core.commands as cmd
 from .BMP import BMP
 from .DDS import DDS
 from .XML import XML
+from sys import platform
 
 class FBX:
     remove_duplicate_vertex = True
@@ -132,7 +133,7 @@ class FBX:
                         name = self.get_full_node_name(node)
                         break
 
-                self.mesh_data[name] = self.get_mesh_data(node)
+                self.mesh_data[name] = self.get_mesh_data(node, path)
                 self.mesh_nodes[name] = node
 
     def save(self, path):
@@ -143,9 +144,11 @@ class FBX:
         (fbx_manager, scene) = FbxCommon.InitializeSdkObjects()
         
         self.handle_data(fbx_manager, scene, path)
-        #fbx_manager.GetIOSettings().SetIntProp(fbx.EXP_FBX_COMPRESS_LEVEL, 9)
+        if not self.debug_mode:
+            fbx_manager.GetIOSettings().SetIntProp(fbx.EXP_FBX_COMPRESS_LEVEL, 9)
         FbxCommon.SaveScene(fbx_manager, scene, "output.fbx", 0)
-        FbxCommon.SaveScene(fbx_manager, scene, "output.fbx.txt", 1)
+        if self.debug_mode:
+            FbxCommon.SaveScene(fbx_manager, scene, "output.fbx.txt", 1)
 
         fbx_manager.Destroy()
         del scene
@@ -355,7 +358,7 @@ class FBX:
 
         return data
 
-    def get_mesh_data(self, node):
+    def get_mesh_data(self, node, path):
         mesh = node.GetMesh()
 
         # ------------------------------------------------ 
@@ -479,12 +482,14 @@ class FBX:
         flat_tri = sum(faces_triangles, [])
         tri_indices_text = str(flat_tri).replace(" ", "").replace("[", "").replace("]", "")
 
-        tri_input = open(f"{cm.temp_path}/triangles.txt", "w")
+        tri_in_path = os.path.join(cm.temp_path, "triangles.txt")
+        tri_input = open(os.path.join(cm.temp_path, "triangles.txt"), 'w')
         tri_input.write(tri_indices_text)
         tri_input.flush()
 
-        cmd.nvtri_stripper(f"{cm.temp_path}\\triangles.txt", f"{cm.temp_path}\\triangles_out.txt")
-        tri_output = open(f"{cm.temp_path}\\triangles_out.txt", "r")
+        tri_out_path = os.path.join(cm.temp_path, "triangles_out.txt")
+        cmd.nvtri_stripper(tri_in_path, tri_out_path)
+        tri_output = open(tri_out_path, "r")
         strip_indices = eval(tri_output.readline().strip())
 
         new_faces_triangles = []
@@ -560,7 +565,11 @@ class FBX:
                     texture_count = layered_texture.GetSrcObjectCount(fbx.FbxCriteria.ObjectType(fbx.FbxTexture.ClassId))
                 for i in range(texture_count):
                     texture = layered_texture.GetSrcObject(fbx.FbxCriteria.ObjectType(fbx.FbxTexture.ClassId), i)
-                    data['materials'].append((texture.GetName(), texture.GetFileName()))
+                    filename = texture.GetFileName()
+                    # If not on Windows, assuming textures are in FBX folder (wrong path given from FBX SDK)
+                    if platform != 'win32':
+                        filename = os.path.join(os.path.dirname(path), filename)
+                    data['materials'].append((texture.GetName(), filename))
 
         data = {k: v for k, v in data.items() if v != []}
 

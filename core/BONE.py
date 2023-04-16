@@ -28,7 +28,7 @@ class BONE:
             # children offsets size
             size += 4 * len(self.bone_entries)
             # string table size
-            size += self.bone_string_table.get_size()
+            size += ut.add_padding(self.bone_string_table.get_size())
         size = ut.add_padding(size)
 
         return size

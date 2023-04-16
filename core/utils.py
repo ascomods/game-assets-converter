@@ -96,19 +96,20 @@ def s2b_name(string):
     return string.encode('latin1')
 
 def format_jap_name(string):
-    try:
-        string.decode('utf-8')
-    except:
-        name_parts = string.rsplit(b'_')[1:]
-        string = b'_'.join(name_parts)
+    while len(string) > 0:
+        try:
+            string.decode('utf-8')
+            break
+        except:
+            string = string[1:]
     return string
 
-def read_until(stream, offset, endChar = b'\x00'):
+def read_until(stream, offset, end_char = b'\x00'):
     initial_pos = stream.tell()
     stream.seek(offset)
     res = bytearray(stream.read(1))
     current_byte = b''
-    while current_byte != endChar:
+    while current_byte != end_char:
         res += current_byte
         current_byte = stream.read(1)
     stream.seek(initial_pos)
@@ -122,7 +123,7 @@ def copy_to_temp_dir(path):
     init_temp_dir()
     name, ext = os.path.splitext(os.path.basename(path))
     shutil.copy2(path, cm.temp_path)
-    return f"{cm.temp_path}/{name}{ext}"
+    return os.path.join(cm.temp_path, name + ext)
 
 def empty_temp_dir():
     path = os.path.abspath(cm.temp_path)

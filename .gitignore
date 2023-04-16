@@ -134,7 +134,8 @@ dmypy.json
 cython_debug/
 
 # VS Code
-.vscode
+.vscode/*
+!.vscode/launch.json
 
 temp/
 settings.ini

@@ -67,50 +67,56 @@ class ImportTask(Task):
 
             # Load data from JSON files
             try:
-                stream = open(f"{os.path.dirname(self.input_path)}\MTRL.json", "r")
+                path = os.path.join(os.path.dirname(self.input_path), "MTRL.json")
+                stream = open(path, "r")
                 mtrl_dict = json.load(stream)
                 stream.close()
             except:
                 mtrl_dict = {}
 
             try:
-                stream = open(f"{os.path.dirname(self.input_path)}\SHAP.json", "r")
+                path = os.path.join(os.path.dirname(self.input_path), "SHAP.json")
+                stream = open(path, "r")
                 shap_dict = json.load(stream)
                 stream.close()
             except:
                 shap_dict = {}
 
             try:
-                stream = open(f"{os.path.dirname(self.input_path)}\VBUF.json", "r")
-                vbuff_dict = json.load(stream)
+                path = os.path.join(os.path.dirname(self.input_path), "VBUF.json")
+                stream = open(path, "r")
+                vbuf_dict = json.load(stream)
                 stream.close()
             except:
-                vbuff_dict = {}
-
+                vbuf_dict = {}
 
             try:
-                stream = open(f"{os.path.dirname(self.input_path)}\SCNE.json", "r")
+                path = os.path.join(os.path.dirname(self.input_path), "SCNE.json")
+                stream = open(path, "r")
                 scne_dict = json.load(stream)
                 stream.close()
             except:
                 scne_dict = {}
 
             try:
-                stream = open(f"{os.path.dirname(self.input_path)}\BONE.json", "r")
+                path = os.path.join(os.path.dirname(self.input_path), "BONE.json")
+                stream = open(path, "r")
                 loaded_bone_dict = json.load(stream)
                 stream.close()
             except:
                 loaded_bone_dict = {}
 
             try:
-                stream = open(f"{os.path.dirname(self.input_path)}\DRVN.json", "r")
+                path = os.path.join(os.path.dirname(self.input_path), "DRVN.json")
+                stream = open(path, "r")
                 drvn_dict = json.load(stream)
                 stream.close()
             except:
                 drvn_dict = {}
 
             try:
-                stream = open(f"{os.path.dirname(self.input_path)}\TXAN.json", "r")
+                path = os.path.join(os.path.dirname(self.input_path), "TXAN.json")
+                stream = open(path, "r")
                 txan_dict = json.load(stream)
                 stream.close()
             except:
@@ -466,7 +472,8 @@ class ImportTask(Task):
                                 # Add source texture if its missing
                                 if shape_object.source_name not in texture_names:
                                     texture_name = ut.b2s_name(shape_object.source_name)
-                                    texture_path = glob.glob(f"{os.path.dirname(self.input_path)}/*{texture_name}")[0]
+                                    texture_path = os.path.join(os.path.dirname(self.input_path), f"*{texture_name}")
+                                    texture_path = glob.glob(texture_path)[0]
                                     layer_name, source_name, texture_names, texture_spr_data_entry = \
                                         self.add_texture(spr_object, texture_names, '', texture_path)
                                     if texture_spr_data_entry != None:
@@ -489,6 +496,8 @@ class ImportTask(Task):
                 except Exception as e:
                     print(mesh_name)
                     print(e)
+                    import traceback
+                    print(traceback.format_exc())
 
                 vbuf_object.load_data()
                 if b'EYE' in mesh_name:
@@ -690,9 +699,9 @@ class ImportTask(Task):
                 tmp_list.append(entry)
             spr['SHAP'].entries = tmp_list
 
-            #Same for VBuff
+            #Same for VBUF
             tmp_list = []
-            for name in vbuff_dict:
+            for name in vbuf_dict:
                 name = ut.s2b_name(name)
             
                 for entry in spr['VBUF'].entries:
@@ -798,8 +807,8 @@ class ImportTask(Task):
                 operate_stpk.add_entry(f"op_{name}.pak", self.data[stpk_key])
                 self.data[stpk_key] = operate_stpk
             
-            stpk_path = f"{cm.temp_path}/{name}.pak"
-            stream = open(f"{cm.temp_path}/{name}.pak", 'wb')
+            stpk_path = os.path.join(cm.temp_path, f"{name}.pak")
+            stream = open(stpk_path, 'wb')
             self.data[stpk_key].write(stream)
             stream.close()
 

@@ -10,6 +10,8 @@ class MTRL:
     def __init__(self, type = '', name = b'', string_table = ''):
         if type == '':
             self.type = self.__class__.__name__
+        else:
+            self.type = type
         self.name = name
         self.string_table = string_table
         self.data = bytes(112)
@@ -31,7 +33,7 @@ class MTRL:
 
         for i in range(10):
             try:
-                layer_name = self.string_table.content[ut.b2i(stream.read(4))]
+                layer_name = self.string_table.content[ut.b2i(stream.read(4))].upper()
                 source_name = self.string_table.content[ut.b2i(stream.read(4))]
                 source_name = ut.format_jap_name(source_name)
                 self.layers.append([layer_name, source_name])
@@ -100,7 +102,6 @@ class MTRL:
         return (
             f'\nclass: {self.__class__.__name__}\n'
             f'name: {self.name}\n'
-            f'data_size: {self.data_size}\n'
             f'data_offset: {self.data_offset}\n'
             f'offset: {self.offset}\n'
             f'layers: {self.layers}\n'
@@ -110,7 +111,7 @@ class MTRL_PROP:
     # Credits to adsl14 for attributes infos
     data_size = 96
 
-    def __init__(self, type = '', name = b'DbzCharMtrl', string_table = ''):
+    def __init__(self, type = '', name = b'DbzMtrl', string_table = ''):
         if type == '':
             self.type = self.__class__.__name__
         self.name = name

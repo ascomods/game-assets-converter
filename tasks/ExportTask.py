@@ -46,7 +46,7 @@ class ExportTask(Task):
                         bone_dict[bone_name] = data
 
                 json_data = json.dumps(bone_dict, indent=4)
-                data_stream = open(f"{self.output_path}\BONE.json", "w")
+                data_stream = open(os.path.join(self.output_path, "BONE.json"), "w")
                 data_stream.write(str(json_data))
             except:
                 print('Bone data is missing')
@@ -111,7 +111,7 @@ class ExportTask(Task):
             new_scne_shape_dict = tmp_list
 
             json_data = json.dumps(new_scne_shape_dict, indent=4)          
-            data_stream = open(f"{self.output_path}\SHAP.json", "w")
+            data_stream = open(os.path.join(self.output_path, "SHAP.json"), "w")
             data_stream.write(str(json_data))
 
             self.send_progress(40)
@@ -136,13 +136,13 @@ class ExportTask(Task):
                     mtrl_dict[ut.b2s_name(data.name)] = content
 
             json_data = json.dumps(mtrl_dict, indent=4)
-            data_stream = open(f"{self.output_path}\MTRL.json", "w")
+            data_stream = open(os.path.join(self.output_path, "MTRL.json"), "w")
             data_stream.write(str(json_data))
 
             # DRVN
             if drvn_data.__class__.__name__ != 'list':
                 json_data = json.dumps(drvn_data.get_data(), indent=4)
-                data_stream = open(f"{self.output_path}\DRVN.json", "w")
+                data_stream = open(os.path.join(self.output_path, "DRVN.json"), "w")
                 data_stream.write(str(json_data))
 
             self.send_progress(60)
@@ -159,7 +159,7 @@ class ExportTask(Task):
                     txan_data.entries[i].name = eye_texture_names[idx]
 
                 json_data = json.dumps(txan_data.get_data(), indent=4)
-                data_stream = open(f"{self.output_path}\TXAN.json", "w")
+                data_stream = open(os.path.join(self.output_path, "TXAN.json"), "w")
                 data_stream.write(str(json_data))
             
             self.send_progress(80)
@@ -167,12 +167,14 @@ class ExportTask(Task):
             # Export other files in current STPK (SPR)
             i = 0
             if 'spr_stpk' in self.data.keys():
-                if not os.path.exists(f"{self.output_path}\\pak_files"):
-                    os.mkdir(f"{self.output_path}\\pak_files")
+                path = os.path.join(self.output_path, "pak_files")
+                if not os.path.exists(path):
+                    os.mkdir(path)
 
                 for entry in self.data['spr_stpk'].entries:
                     if b'.spr' not in entry.name:
-                        stream = open(f"{self.output_path}\\pak_files\\[{i}]{ut.b2s_name(entry.name)}", "wb")
+                        path = os.path.join(self.output_path, "pak_files", f"[{i}]{ut.b2s_name(entry.name)}")
+                        stream = open(path, "wb")
                         stream.write(entry.data)
                         stream.close()
                         i += 1
@@ -182,7 +184,7 @@ class ExportTask(Task):
                 scne_dict = {}
                 scne_dict['DbzEyeInfo'] = scne_data[0].children[2].get_data()['data']['eye_entries']
                 json_data = json.dumps(scne_dict, indent=4)
-                data_stream = open(f"{self.output_path}\SCNE.json", "w")
+                data_stream = open(os.path.join(self.output_path, "SCNE.json"), "w")
                 data_stream.write(str(json_data))
             
             # create a json vBuff.json file to get vbuuf in the same order to repack (and make comparaison with fbx txt or binary version of spr)
@@ -191,7 +193,7 @@ class ExportTask(Task):
                 if data.__class__.__name__ == "SPRPDataEntry":
                     vbuf_list.append(ut.b2s_name(data.name))
             json_data = json.dumps(vbuf_list, indent=4)
-            data_stream = open(f"{self.output_path}\VBUF.json", "w")
+            data_stream = open(os.path.join(self.output_path, "VBUF.json"), "w")
             data_stream.write(str(json_data))
             
 

@@ -4,14 +4,18 @@ import struct
 class TGA:
     def __init__(self, name, width, height, data):
         self.name = name
+        self.ext = f".{self.__class__.__name__.lower()}"
+
         # Header
         self.id_length = 0
         self.color_map_type = 0
         self.image_type = 2
+
         # Colormap specification
         self.first_index_entry = 0
         self.color_map_length = 0
         self.color_map_entry_size = 0
+
         # Image specification
         self.x_origin = 0
         self.y_origin = 0
@@ -42,6 +46,6 @@ class TGA:
         if not os.path.exists(path):
             os.mkdir(path)
         
-        stream = open(f"{path}/{self.name}.tga", 'wb')
+        stream = open(os.path.join(path, self.name + self.ext), 'wb')
         self.write(stream)
         stream.close()

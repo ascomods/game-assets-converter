@@ -1,4 +1,5 @@
 from PyQt5 import QtCore
+from PyQt5.QtCore import QUrl
 from PyQt5.QtWidgets import QWidget
 import qtawesome as qta
 from ui.handlers.WindowHandler import WindowHandler
@@ -47,10 +48,12 @@ class MainWindowHandler(WindowHandler, QWidget):
     @QtCore.pyqtSlot()
     def game_select_action(self):
         cm.selected_game = list(cm.games.keys())[self.ui.game_cmb_box.currentIndex()]
+        cm.settings.setValue("Game", QUrl(cm.selected_game).toString())
 
     @QtCore.pyqtSlot()
     def platform_select_action(self):
         cm.selected_platform = list(cm.platforms.keys())[self.ui.platform_cmb_box.currentIndex()]
+        cm.settings.setValue("Platform", QUrl(cm.selected_platform).toString())
 
     @observable_method()
     def notify_import_action(self, arg):
