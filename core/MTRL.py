@@ -74,7 +74,7 @@ class MTRL:
         """
         Sort layers by putting colormaps either first or last
         """
-        sortedLayers = []
+        sorted_layers = []
         
         if color_map_first:
             names = []
@@ -85,18 +85,18 @@ class MTRL:
             for layer_name in names:
                 for layer in self.layers:
                     if layer[0] == layer_name:
-                        sortedLayers.append(layer)
+                        sorted_layers.append(layer)
                         break
         else:
             for layer in self.layers:
                 if layer[0] not in [b'COLORMAP', b'COLORMAP0']:
-                    sortedLayers.append(layer)
+                    sorted_layers.append(layer)
 
             for layer in self.layers:
                 if layer[0] in [b'COLORMAP', b'COLORMAP0']:
-                    sortedLayers.append(layer)
+                    sorted_layers.append(layer)
         
-        self.layers = sortedLayers
+        self.layers = sorted_layers
 
     def __repr__(self):
         return (

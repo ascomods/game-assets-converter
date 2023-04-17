@@ -20,6 +20,7 @@ class FBX:
     use_per_vertex = True
     version_from_vertices_list = True
     debug_mode = False
+    use_blender = False
 
     colors_components = ['r', 'g', 'b', 'a']
     others_components = ['x', 'y', 'z', 'w']
@@ -445,7 +446,8 @@ class FBX:
 
             # Fill if not defined to always have nb_bone_layer values
             for j in range(nb_bone_layer):
-                blend = blends[j] if (j < nb_bone_layer) else {'indexBone': 0, 'weight': 0.0}
+                blend = blends[j] if ((j < nb_bone_layer) and (j < len(blends))) \
+                    else {'indexBone': 0, 'weight': 0.0}
                 vertices[i]['blend_indices'].append(blend['indexBone'])
                 vertices[i]['blend_weights'].append(blend['weight'])
 
@@ -563,16 +565,31 @@ class FBX:
             for i in range(node.GetMaterialCount()):
                 material = node.GetMaterial(i)
                 prop = material.FindProperty(fbx.FbxSurfaceMaterial.sDiffuse)
-                layered_texture = prop.GetSrcObject(fbx.FbxCriteria.ObjectType(fbx.FbxLayeredTexture.ClassId), 0)
-                if layered_texture:
-                    texture_count = layered_texture.GetSrcObjectCount(fbx.FbxCriteria.ObjectType(fbx.FbxTexture.ClassId))
+
+                # Reading textures from materials directly if layered textures aren't found
+                source_obj = prop.GetSrcObject(fbx.FbxCriteria.ObjectType(fbx.FbxLayeredTexture.ClassId), 0)
+                if source_obj:
+                    texture_count = source_obj.GetSrcObjectCount(fbx.FbxCriteria.ObjectType(fbx.FbxTexture.ClassId))
+                else:
+                    texture_count = prop.GetSrcObjectCount(fbx.FbxCriteria.ObjectType(fbx.FbxTexture.ClassId))
+                    source_obj = prop
+
                 for i in range(texture_count):
-                    texture = layered_texture.GetSrcObject(fbx.FbxCriteria.ObjectType(fbx.FbxTexture.ClassId), i)
+                    texture = source_obj.GetSrcObject(fbx.FbxCriteria.ObjectType(fbx.FbxTexture.ClassId), i)
                     filename = texture.GetFileName()
-                    # If not on Windows, assuming textures are in FBX folder (wrong path given from FBX SDK)
-                    if platform != 'win32':
+                    # GetFileName sometimes returns the filename or a path
+                    # Assuming textures are in FBX folder if filename only is provided
+                    if not os.path.exists(os.path.dirname(filename)):
                         filename = os.path.join(os.path.dirname(path), filename)
-                    data['materials'].append((texture.GetName(), filename))
+
+                    if isinstance(source_obj, fbx.FbxLayeredTexture):
+                        name = texture.GetName()
+                    elif self.use_blender:
+                        name = material.GetName().split(':')[-1].split('.')[0]
+                    else:
+                        name = material.GetName()
+
+                    data['materials'].append((name, filename))
 
         if cm.selected_game == 'dbut':
             data['face_indices'] = strip_indices
@@ -997,17 +1014,25 @@ class FBX:
         for material in self.data['material']:
             if (ut.b2s_name(material.name) == material_name) or \
                (material_name in ut.b2s_name(material.name)):
-                material.data.sort()
-                mat = self.add_material(scene, material_name)
+                material.data.sort(self.use_blender)
+                if self.use_blender:
+                    for i in range(0, len(material.data.layers)):
+                        layer = material.data.layers[i]
 
-                layered_texture = fbx.FbxLayeredTexture.Create(scene, "")
-                mat.Diffuse.ConnectSrcObject(layered_texture)
-                node.AddMaterial(mat)
+                        mat = self.add_material(scene, f"{ut.b2s_name(material.name)}:{ut.b2s_name(layer[0])}")
+                        node.AddMaterial(mat)
+                        texture = self.add_texture(scene, layer[0], layer[1])
+                        mat.Diffuse.ConnectSrcObject(texture)
+                else:
+                    mat = self.add_material(scene, material_name)
+                    layered_texture = fbx.FbxLayeredTexture.Create(scene, "")
+                    mat.Diffuse.ConnectSrcObject(layered_texture)
+                    node.AddMaterial(mat)
 
-                for i in range(0, len(material.data.layers)):
-                    layer = material.data.layers[i]
-                    texture = self.add_texture(scene, layer[0], layer[1])
-                    layered_texture.ConnectSrcObject(texture)
+                    for i in range(0, len(material.data.layers)):
+                        layer = material.data.layers[i]
+                        texture = self.add_texture(scene, layer[0], layer[1])
+                        layered_texture.ConnectSrcObject(texture)
                 return True
         return False
 
