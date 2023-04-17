@@ -273,3 +273,12 @@ def makeTranformRotationFromTransformOrientation(quat):	 # orientation == Quater
 
 
 
+
+def getSettingsOrAddDefault(settings, name, defaultValue):
+    ret = settings.value(name)
+    if(ret == None):
+        ret = defaultValue
+        settings.setValue(name, ret)
+    return ret
+
+

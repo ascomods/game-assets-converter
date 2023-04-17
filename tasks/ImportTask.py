@@ -26,6 +26,7 @@ class ImportTask(Task):
     def __init__(self, data, input_path, spr_path, ioram_path, vram_path, other_files):
         super().__init__()
         self.data = data
+        self.settings = self.data["settings"]
         self.input_path = input_path
         self.spr_path = spr_path
         self.ioram_path = ioram_path
@@ -38,6 +39,7 @@ class ImportTask(Task):
             ut.init_temp_dir()
 
             fbx_object = FBX()
+            fbx_object.settings = self.settings
             fbx_object.load(self.input_path)
 
             fbx_name = os.path.basename(self.input_path).rsplit('.', 1)[0]
@@ -250,7 +252,6 @@ class ImportTask(Task):
             scne_parts = {}
             scene_layers = {}
 
-            versionFromVerticeList = True
 
             for mesh_name, data in fbx_object.mesh_data.items():
                 layered_mesh_name = mesh_name
@@ -261,60 +262,15 @@ class ImportTask(Task):
                 except IndexError:
                     pass
                 mesh_name = ut.s2b_name(mesh_name)
+                shap_name = b''
+                shape_name = b''
+                
 
                 try:
                     if layer_name != '':
                         scene_layers[mesh_name] = ut.s2b_name(layer_name)
 
                     vbuf_object = VBUF('', '', spr_object.string_table)
-
-                    
-                    if not versionFromVerticeList:           
-
-                        # Adjusting weights and indices data from FBX to RB format 
-                        #  -> there are listed by bone/cluster and after by vertex, so you need to inverse lists, and get back layer notion
-                        # it's allready done into mode versionFromVerticeList
-                        weights = data['bone_weights']
-                        indices = data['bone_indices']
-                        
-                        all_weights = {}
-                        all_indices = {}
-                        for i in range(len(indices)):
-                            for j in range(len(indices[i]['data'])):
-                                key = list(indices[i]['data'][j].keys())[0]
-                                if key not in all_indices:
-                                    all_indices[key] = [indices[i]['data'][j][key]]
-                                    all_weights[key] = [weights[i]['data'][j][key]]
-                                else:
-                                    all_indices[key].append(indices[i]['data'][j][key])
-                                    all_weights[key].append(weights[i]['data'][j][key])
-
-                        data_lists_count = 0
-                        for i in range(len(data['positions'][0]['data'])):
-                            if i not in all_indices.keys():
-                                all_indices[i] = [0]
-                                all_weights[i] = [0.0]
-                            elif data_lists_count < len(all_indices[i]):
-                                data_lists_count = len(all_indices[i])
-
-                        # Adjusting lists to the same size
-                        for i in range(len(data['positions'][0]['data'])):
-                            if len(all_indices[i]) < data_lists_count:
-                                for j in range(len(all_indices[i]), data_lists_count):
-                                    all_indices[i].append(0)
-                                    all_weights[i].append(0.0)
-                        
-                        data['bone_weights'] = []
-                        data['bone_indices'] = []
-                        
-                        for i in range(data_lists_count):
-                            data['bone_indices'].append({'data': []})
-                            data['bone_weights'].append({'data': []})
-                        
-                        for i in range(len(all_indices)):
-                            for j in range(len(all_indices[i])):
-                                data['bone_indices'][j]['data'].append((all_indices[i][j],))
-                                data['bone_weights'][j]['data'].append((all_weights[i][j],))
 
                     # Handle data from FBX
                     for vtx_usage, vtx_data_entries in data.items():
@@ -352,12 +308,12 @@ class ImportTask(Task):
                                         vtx = decl_data['data'][i]
                                         decl_data['data'][i] = (vtx[0], vtx[1], vtx[2], 0.0)
 
-                                elif ((versionFromVerticeList) and (vtx_usage == 'uvs')):
+                                elif (vtx_usage == 'uvs'):
                                     for i in range(len(decl_data['data'])):
                                         vtx = decl_data['data'][i]
                                         decl_data['data'][i] = (vtx[0], vtx[1])
 
-                                elif ((versionFromVerticeList) and ((vtx_usage == 'bone_indices') or (vtx_usage == 'bone_weights'))):
+                                elif ((vtx_usage == 'bone_indices') or (vtx_usage == 'bone_weights')):
                                     for i in range(len(decl_data['data'])):
                                         decl_data['data'][i] = [decl_data['data'][i]]
 

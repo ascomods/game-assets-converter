@@ -10,8 +10,19 @@ class ExportTask(Task):
         super().__init__()
         self.data = data
         self.output_path = output_path
+        self.settings = self.data["settings"]
 
     def run(self):
+        
+        bones_matrixToDisplay = {\
+            "abs_transformMatrix":  (ut.getSettingsOrAddDefault(self.settings, "BonesXml_Display_abs_transformMatrix", True) == 'true'),\
+            "inv_transformMatrix":  (ut.getSettingsOrAddDefault(self.settings, "BonesXml_Display_inv_transformMatrix", False) == 'true'),\
+            "rel_transformMatrix":  (ut.getSettingsOrAddDefault(self.settings, "BonesXml_Display_rel_transformMatrix", True) == 'true'),\
+            "ConvertInTransform":   (ut.getSettingsOrAddDefault(self.settings, "BonesXml_Display_ConvertInTransformPosRotScake", False) == 'true'),\
+            "transform1_2":         (ut.getSettingsOrAddDefault(self.settings, "BonesXml_Display_transform1_2", True) == 'true'),\
+            "DbzBoneInfo":          (ut.getSettingsOrAddDefault(self.settings, "BonesXml_Display_DbzBoneInfo", True) == 'true'),\
+            "tranform1and2_debugMesh":(ut.getSettingsOrAddDefault(self.settings, "BonesXml_Display_CreateTranform1and2_debugMesh", False) == 'true') }            
+
         try:
             ut.empty_temp_dir()
             ut.init_temp_dir()
@@ -244,20 +255,28 @@ class ExportTask(Task):
                             datasXml += indent +'\t</'+ name +'>\n'
                         return datasXml
                     
-                    if(matrixToDisplay["abs_transform"]):
+                    if(matrixToDisplay["abs_transformMatrix"]):
                         datasXml += createBoneNodeXml_recur_Matrix("AbsoluteTransformMatrix", node_tmp.abs_transform)
-                    if(matrixToDisplay["inv_transform"]):
+                        if(matrixToDisplay["ConvertInTransform"]):
+                            aa = 42     # Todo add traduction into position rotation scale (Absolute and relative)
+
+                    if(matrixToDisplay["inv_transformMatrix"]):
                         datasXml += createBoneNodeXml_recur_Matrix("InverseTransform", node_tmp.inv_transform)
-                    if(matrixToDisplay["rel_transform"]):
+                        #if(matrixToDisplay["ConvertInTransform"]): #Todo
+                        # Todo look at the differencies with Inv and Abs Matrix (only position but why ?)
+
+                    if(matrixToDisplay["rel_transformMatrix"]):
                         datasXml += createBoneNodeXml_recur_Matrix("RelativeTransform", node_tmp.rel_transform)
-                    if(matrixToDisplay["transform1"]):
+                        #if(matrixToDisplay["ConvertInTransform"]): #Todo
+
+                    if(matrixToDisplay["transform1_2"]):
                         t = node_tmp.transform1
                         t2 = node_tmp.transform2
                         minV3 = [t[0][0], t[1][0], t[2][0]]
                         maxV3 = [t[3][0], t[0][1], t[1][1]]
                         matrix3x3 = [[t[2][1], t[3][1], t[0][2]], [t[1][2], t[2][2], t[3][2]], [t[0][3], t[1][3], t[2][3]] ]
                         scale = t[3][3]
-                        datasXml = ""
+                        datasXml += ""
                         datasXml += indent +'\t<Transf_1>\n'
                         datasXml += indent +'\t\t<MinRotAngles x="'+ str(np.rad2deg(minV3[0])) +'" y="'+ str(np.rad2deg(minV3[1])) +'" z="'+ str(np.rad2deg(minV3[2])) +'" />\n'
                         datasXml += indent +'\t\t<MaxRotAngles x="'+ str(np.rad2deg(maxV3[0])) +'" y="'+ str(np.rad2deg(maxV3[1])) +'" z="'+ str(np.rad2deg(maxV3[2])) +'" />\n'
@@ -269,6 +288,8 @@ class ExportTask(Task):
                         datasXml += indent +'\t\t<UnknowScale value="'+ str(scale) +'" />\n'
                         datasXml += indent +'\t</Transf_1>\n'
 
+                        datasXml += createBoneNodeXml_recur_Matrix("Transf_2", node_tmp.transform2)
+
 
                         def createBoneNodeXml_recur_CreateRotatedCube(minV3, maxV3, matrix3x3, scale, node_tmp, suffix):
                             global debugMeshs
@@ -278,12 +299,6 @@ class ExportTask(Task):
                             #    return
                             
                             debugMeshs.append( debugMesh )
-            
-                            
-                            #simple Cube, center on bottom center  Todo Remove
-                            #minV3 = [-0.5, -0.5, -0.5]
-                            #maxV3 = [0.5, 0.5, 0.5]
-
 
                             vertices = debugMesh["vertices"]
                             faces = debugMesh["faces"]
@@ -299,16 +314,7 @@ class ExportTask(Task):
                                             [maxV3[0], maxV3[1], maxV3[2]],\
                                             [minV3[0], maxV3[1], maxV3[2]] ]  # 0:A, 1:B, 2:C, 3:D, 4:E, 5:F, 6:G, 7:H
                             
-                            #RotZ=-90 : X = -y, Y= x Z=Z
-                            # cubeVertex = [  [minV3[1], -minV3[0], minV3[2]],\
-                            #                 [minV3[1], -maxV3[0], minV3[2]],\
-                            #                 [minV3[1], -maxV3[0], maxV3[2]],\
-                            #                 [minV3[1], -minV3[0], maxV3[2]],\
-                            #                 [maxV3[1], -minV3[0], minV3[2]],\
-                            #                 [maxV3[1], -maxV3[0], minV3[2]],\
-                            #                 [maxV3[1], -maxV3[0], maxV3[2]],\
-                            #                 [maxV3[1], -minV3[0], maxV3[2]] ]  # 0:A, 1:B, 2:C, 3:D, 4:E, 5:F, 6:G, 7:H
-
+                            
                             #multiply by the Absolute Transform of Bone and matrix3x3
                             t = node_tmp.abs_transform
                             bone_AbsTf_Matrix4x4 = []
@@ -329,12 +335,9 @@ class ExportTask(Task):
 
                                 v = ut.multiply_Mat3_Vect3(ut.transpose_Mat3(matrix3x3), v)
                                 v = ut.multiply_Mat4_Vect3(ut.transpose_Mat4(bone_AbsTf_Matrix4x4), v)
-                                #v = ut.multiply_Mat4_Vect3(ut.transpose_Mat4(bone_invTf_Matrix4x4), v)
                                 #v = ut.addVect3(v, node_pos)
 
                                 vertices.append( {"position": {"x": v[0], "y": v[1], "z": v[2], "w": 1.0}, "bone_indices": node_tmp.index, "bone_weights": 1.0  } )    #Todo check how node_tmp.index is done in FBX.py
-                            
-                            #multiplcation with T1.UnkowwFloat ?
 
                             # Bottom ABCD
                             faces.append( [startFIndex + 0, startFIndex + 2, startFIndex + 1] )     # ACB
@@ -356,29 +359,19 @@ class ExportTask(Task):
                             faces.append( [startFIndex + 7, startFIndex + 2, startFIndex + 3] )     # HCD
                         
                         
-                        if(scale!=0):
-                            #createBoneNodeXml_recur_CreateRotatedCube(minV3, maxV3, matrix3x3, scale, node_tmp, "_T1")
+                        if((scale!=0) and (matrixToDisplay["tranform1and2_debugMesh"])):                             
+                            #createBoneNodeXml_recur_CreateRotatedCube(minV3, maxV3, matrix3x3, scale, node_tmp, "_T1") #is wroung to use T1_MinMax because it's radians angles, not a position values.
                             
+                            #simple Cube, center on bottom center  Todo Remove
+                            #minV3 = [-0.5, -0.5, -0.5]
+                            #maxV3 = [0.5, 0.5, 0.5]
+
                             # hyp the last float of T1 (witch look like a scale) should be with the two others values, the ones in T2
                             minV3 = [-t[3][3]/2.0, -t2[0][0]/2.0, -t2[1][0]/2.0]
                             maxV3 = [t[3][3]/2.0, t2[0][0]/2.0, t2[1][0]/2.0]
                             
                             createBoneNodeXml_recur_CreateRotatedCube(minV3, maxV3, matrix3x3, 1.0, node_tmp, "_T1")
 
-
-                            
-
-                            
-
-
-                            
-
-
-                        
-
-                    if(matrixToDisplay["transform2"]):
-                        datasXml += createBoneNodeXml_recur_Matrix("Transf_2", node_tmp.transform2)
-                    
 
                     if((data) and (data["DbzBoneInfo"]) and (matrixToDisplay["DbzBoneInfo"])):
                         dbzBoneInfo = data["DbzBoneInfo"]
@@ -391,9 +384,6 @@ class ExportTask(Task):
                         datasXml += indent +'\t\t<unk2 x="'+ str(listV3[6]) +'" y="'+ str(listV3[7]) +'" z="'+ str(listV3[8]) +'" >\n'
                         datasXml += indent +'\t</DbzBoneInfo>\n'
                         # => it's vextor3_sero, + negative Translation of RelativeMatrix  (twice vector, but why ?)
-
-                    # Todo add traduction into position rotation scale (Absolute and relative)
-                    # Todo look at the differencies with Inv and Abs Matrix (only position but why ?)
                 
 
                 haveChilds = ((node_tmp.children)and (len(node_tmp.children)))
@@ -419,8 +409,7 @@ class ExportTask(Task):
 
             incBone = 0
             debugMeshs = []
-            matrixToDisplay = {"abs_transform": True, "inv_transform": True, "rel_transform": True, "transform1": True, "transform2": True, "DbzBoneInfo": False}
-            xmlStr = createBoneNodeXml_recur(bone_data[0].data.bone_entries[0], 0, matrixToDisplay, bone_data[0].data.bone_entries)
+            xmlStr = createBoneNodeXml_recur(bone_data[0].data.bone_entries[0], 0, bones_matrixToDisplay, bone_data[0].data.bone_entries)
             data_stream = open(f"{self.output_path}\BONE.xml", "w")
             data_stream.write(str(xmlStr))
 
@@ -471,9 +460,6 @@ class ExportTask(Task):
                     node_TagName = "DbzEyeInfo"
                     name = ""
                     haveChildsTags = False
-                #elif(name=="[MATERIAL]"):      # Todo detect ":" for having the MaterialName (in that case haveChildsTags=false)
-                #    aa= 42
-                                                # todo make the 
                 elif(name=="[MATERIAL]"):
                     node_TagName = "Material"
                     name = ut.b2s_name(node_tmp.data.name)
@@ -588,6 +574,7 @@ class ExportTask(Task):
 
 
             fbx_object = FBX()
+            fbx_object.settings = self.settings
             fbx_object.data = {
                 'bone': bone_data,
                 'model': vbuf_data,

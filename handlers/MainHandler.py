@@ -17,6 +17,7 @@ class MainHandler():
         self.paths = {}
         self.data = {}
         self.settings = QSettings("settings.ini", QSettings.IniFormat)
+        self.data["settings"] = self.settings
 
         if view_handler != None:
             self.view_handler = view_handler
@@ -48,8 +49,7 @@ class MainHandler():
             self.task = eval(task_class)(self.data, *args)
             self.task.moveToThread(self.thread)
             self.task.progress_signal.connect(
-                self.view_handler.window_handler.set_progress
-            )
+                self.view_handler.window_handler.set_progress)
             self.task.result_signal.connect(self.task_done_action)
             self.task.finish_signal.connect(self.thread.quit)
             self.thread.started.connect(self.task.run)
@@ -85,15 +85,8 @@ class MainHandler():
             return        
         self.settings.setValue("LastFbxLoaded", QUrl(self.fbx_path).adjusted(QUrl.RemoveFilename).toString())
 
-        useSameNameForSprAndFolder = self.settings.value("UseSameNameForSprAndFolder")
-        if(useSameNameForSprAndFolder == None):
-            useSameNameForSprAndFolder = False
-            self.settings.setValue("UseSameNameForSprAndFolder", useSameNameForSprAndFolder)
-        useSameNameForSprAndFolder = (useSameNameForSprAndFolder == 'true')
-        preferedFormat = self.settings.value("preferedFormat")
-        if(preferedFormat == None):
-            preferedFormat = "spr"
-            self.settings.setValue("preferedFormat", preferedFormat)
+        useSameNameForSprAndFolder = (ut.getSettingsOrAddDefault(self.settings, "UseSameNameForSprAndFolder", False) == 'true')
+        preferedFormat = ut.getSettingsOrAddDefault(self.settings, "preferedFormat", "spr")
         
         # Output files
         if(useSameNameForSprAndFolder):
@@ -181,18 +174,8 @@ class MainHandler():
 
             if ('spr' in self.data.keys()) and ('ioram' in self.data.keys()) and ('vram' in self.data.keys()):
                 
-                useSameNameForSprAndFolder = self.settings.value("UseSameNameForSprAndFolder")
-                if(useSameNameForSprAndFolder == None):
-                    useSameNameForSprAndFolder = False
-                    self.settings.setValue("UseSameNameForSprAndFolder", useSameNameForSprAndFolder)
-                useSameNameForSprAndFolder = (useSameNameForSprAndFolder == 'true')
-
-                automaticOverideFolder = self.settings.value("AutomaticOverideFolder")
-                if(automaticOverideFolder == None):
-                    automaticOverideFolder = False
-                    self.settings.setValue("AutomaticOverideFolder", automaticOverideFolder)
-                automaticOverideFolder = (automaticOverideFolder == 'true')
-
+                useSameNameForSprAndFolder = (ut.getSettingsOrAddDefault(self.settings, "UseSameNameForSprAndFolder", False) == 'true')
+                automaticOverideFolder = (ut.getSettingsOrAddDefault(self.settings, "AutomaticOverideFolder", False) == 'true')
 
                 if(useSameNameForSprAndFolder):
                     self.output_path = spr_path.replace(".spr", "").replace(".pak", "").replace(".zpak", "")
