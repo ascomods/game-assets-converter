@@ -823,7 +823,7 @@ class FBX:
                     
                     for j in range(nbVertex):
                         vertex = vertices[j]
-                        vertex[ axisXYZ[ axisToFill ]["name"] ].append( ut.crossProd_Vect4( vertex[ axisXYZ[ srcAxis[0] ]["name"] ][i], vertex[ axisXYZ[ srcAxis[1] ]["name"] ][i] ) )
+                        vertex[ axisXYZ[ axisToFill ]["name"] ].append( ut.crossProd_Vect4_XYZW( vertex[ axisXYZ[ srcAxis[0] ]["name"] ][i], vertex[ axisXYZ[ srcAxis[1] ]["name"] ][i] ) )
 
             if((isModified) and (buildDebugMeshXml)):
                 self.createMeshDebugXml("11_CompleteBinormalTangent", name.replace(":", "_"), vertices, faces_triangles)

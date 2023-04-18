@@ -19,10 +19,11 @@ class ExportTask(Task):
             "inv_transformMatrix":  (ut.getSettingsOrAddDefault(self.settings, "BonesXml_Display_inv_transformMatrix", False) == 'true'),\
             "rel_transformMatrix":  (ut.getSettingsOrAddDefault(self.settings, "BonesXml_Display_rel_transformMatrix", True) == 'true'),\
             "ConvertInTransform":   (ut.getSettingsOrAddDefault(self.settings, "BonesXml_Display_ConvertInTransformPosRotScake", False) == 'true'),\
+            "Test_BackInMatrix":    (ut.getSettingsOrAddDefault(self.settings, "BonesXml_Display_Test_BackInMatrix", True) == 'true'),\
             "transform1_2":         (ut.getSettingsOrAddDefault(self.settings, "BonesXml_Display_transform1_2", True) == 'true'),\
             "DbzBoneInfo":          (ut.getSettingsOrAddDefault(self.settings, "BonesXml_Display_DbzBoneInfo", True) == 'true'),\
             "tranform1and2_debugMesh":(ut.getSettingsOrAddDefault(self.settings, "BonesXml_Display_CreateTranform1and2_debugMesh", False) == 'true') }            
-
+        
         try:
             ut.empty_temp_dir()
             ut.init_temp_dir()
@@ -254,19 +255,39 @@ class ExportTask(Task):
                                 datasXml += indent +'\t\t<Line x="'+ str(t[0][i]) +'" y="'+ str(t[1][i]) +'" z="'+ str(t[2][i]) +'" w="'+ str(t[3][i]) +'" />\n'
                             datasXml += indent +'\t</'+ name +'>\n'
                         return datasXml
+
+                    def createBoneNodeXml_recur_TransformRot(name, t):
+                        datasXml = indent +'\t<'+ name +'>\n'
+                        datasXml += indent +'\t\t<Position x="'+ str(t[0][0]) +'" y="'+ str(t[0][1]) +'" z="'+ str(t[0][2]) +'" w="'+ str(t[0][3]) +'" />\n'
+                        datasXml += indent +'\t\t<Rotation x="'+ str(t[1][0]) +'" y="'+ str(t[1][1]) +'" z="'+ str(t[1][2]) +'" />\n'
+                        datasXml += indent +'\t\t<Scale    x="'+ str(t[2][0]) +'" y="'+ str(t[2][1]) +'" z="'+ str(t[2][2]) +'" w="'+ str(t[2][3]) +'" />\n'
+                        datasXml += indent +'\t</'+ name +'>\n'
+                        return datasXml
+
                     
                     if(matrixToDisplay["abs_transformMatrix"]):
                         datasXml += createBoneNodeXml_recur_Matrix("AbsoluteTransformMatrix", node_tmp.abs_transform)
+
                         if(matrixToDisplay["ConvertInTransform"]):
-                            aa = 42     # Todo add traduction into position rotation scale (Absolute and relative)
+                            posOrientScale = ut.makeTransformFromMatrix4x4(node_tmp.abs_transform)
+                            rotation = ut.makeTranformRotationFromTransformOrientation(posOrientScale[1])
+
+                            datasXml += createBoneNodeXml_recur_TransformRot("AbsTr", [posOrientScale[0], rotation, posOrientScale[2]] )
+
+                            if(matrixToDisplay["Test_BackInMatrix"]):           #test of convertions functions, see if we get back previous matrix
+                                quat_b = ut.makeTranformOrientationFromTransformRotation(rotation)
+                                mat_b = ut.makeMatrix4x4FromTransform([posOrientScale[0], quat_b, posOrientScale[2]])
+                                datasXml += createBoneNodeXml_recur_Matrix("AbTrMat_TestReConvertion", mat_b)
+
+
 
                     if(matrixToDisplay["inv_transformMatrix"]):
-                        datasXml += createBoneNodeXml_recur_Matrix("InverseTransform", node_tmp.inv_transform)
+                        datasXml += createBoneNodeXml_recur_Matrix("InverseTransformMatrix", node_tmp.inv_transform)
                         #if(matrixToDisplay["ConvertInTransform"]): #Todo
                         # Todo look at the differencies with Inv and Abs Matrix (only position but why ?)
 
                     if(matrixToDisplay["rel_transformMatrix"]):
-                        datasXml += createBoneNodeXml_recur_Matrix("RelativeTransform", node_tmp.rel_transform)
+                        datasXml += createBoneNodeXml_recur_Matrix("RelativeTransformMatrix", node_tmp.rel_transform)
                         #if(matrixToDisplay["ConvertInTransform"]): #Todo
 
                     if(matrixToDisplay["transform1_2"]):
