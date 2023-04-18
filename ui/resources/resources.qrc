@@ -2,4 +2,7 @@
   <qresource prefix="icons">
     <file>db.ico</file>
   </qresource>
+  <qresource prefix="styles">
+    <file>app.qss</file>
+  </qresource>
 </RCC>

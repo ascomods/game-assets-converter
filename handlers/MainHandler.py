@@ -65,7 +65,7 @@ class MainHandler():
         self.view_handler.close_window()
         if callback != None:
             self.view_handler.disable_elements()
-            self.view_handler.load_window('ProgressWindowHandler', False)
+            self.view_handler.load_window('ProgressWindowHandler')
 
             if callback == 'ExportTask':
                 self.run_task('ExportTask', (self.output_path,))
@@ -131,8 +131,7 @@ class MainHandler():
         ext = self.spr_path.rsplit('.', 1)[1].lower()
         if (ext == 'zpak') or (ext == 'pak'):
             self.view_handler.disable_elements()
-            self.view_handler.load_window('ListWindowHandler', False, 
-                f"Files to include in {ext} files")
+            self.view_handler.load_window('ListWindowHandler', f"Files to include in {ext} file")
             
             self.files = {}
             for path in natsorted(glob.glob(os.path.join(self.input_path, "*"))):
@@ -184,14 +183,14 @@ class MainHandler():
 
                 if len(os.listdir(self.output_path)) > 0:
                     self.view_handler.show_message_dialog(
-                        "Folder is not empty, data may be overwritten, Proceed ?", 'question', '', 'ExportTask'
+                        'Folder is not empty, data may be overwritten, Proceed ?', 'question', 'ExportTask'
                     )
                 else:
                     self.view_handler.disable_elements()
                     self.view_handler.load_window('ProgressWindowHandler')
                     self.run_task('ExportTask', (self.output_path,))
         except Exception as e:
-            self.view_handler.show_message_dialog("Error during convertion", 'critical')
+            self.view_handler.show_message_dialog('Error during convertion', 'critical')
 
     def get_stpk_file(self, path):
         stream = open(path, 'rb')
@@ -294,4 +293,4 @@ class MainHandler():
             print(e)
             import traceback
             traceback.print_exc()
-            self.view_handler.show_message_dialog("Error while loading files", 'critical')
+            self.view_handler.show_message_dialog('Error while loading files', 'critical')

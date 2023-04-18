@@ -7,11 +7,11 @@
     <x>0</x>
     <y>0</y>
     <width>550</width>
-    <height>180</height>
+    <height>220</height>
    </rect>
   </property>
   <property name="sizePolicy">
-   <sizepolicy hsizetype="Maximum" vsizetype="Maximum">
+   <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
     <horstretch>0</horstretch>
     <verstretch>0</verstretch>
    </sizepolicy>
@@ -19,13 +19,13 @@
   <property name="minimumSize">
    <size>
     <width>550</width>
-    <height>180</height>
+    <height>220</height>
    </size>
   </property>
   <property name="maximumSize">
    <size>
     <width>550</width>
-    <height>180</height>
+    <height>220</height>
    </size>
   </property>
   <property name="windowTitle">
@@ -37,50 +37,6 @@
   </property>
   <property name="toolTipDuration">
    <number>-1</number>
-  </property>
-  <property name="styleSheet">
-   <string notr="true">* {
-   color: rgb(255, 255, 255);
-}
-
-QStatusBar{
-  background-color: rgb(40, 40, 40);
-}
-
-QToolTip {
-  color: black;
-}
-
-QLabel {
-  color: rgb(255, 255, 255);
-}
-
-QScrollBar:vertical {              
-    border: unset;
-    background-color: rgb(31, 38, 79);
-    width:10px;    
-    margin: 0px 0px 0px 0px;
-}
-
-QScrollBar::handle:vertical {
-    border-radius: 4px;
-    background-color: rgb(11, 95, 181);
-    min-height: 0px;
-}
-
-QScrollBar::add-page:horizontal, QScrollBar::sub-page:horizontal,
-QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {
-    height: 0px;
-    background: none;
-}
-
-QScrollBar::add-line:vertical {
-    height: 0px;
-}
-
-QScrollBar::sub-line:vertical {
-    height: 0px;
-}</string>
   </property>
   <property name="locale">
    <locale language="English" country="UnitedStates"/>
@@ -104,13 +60,6 @@ QScrollBar::sub-line:vertical {
     </property>
     <item>
      <widget class="QFrame" name="main_frame">
-      <property name="styleSheet">
-       <string notr="true">#main_frame {
-	border: 1px solid rgb(124, 124, 124);
-	border-radius: 10px;
-	background-color: qlineargradient(spread:pad, x1:0, y1:0, x2:1, y2:1, stop:0 rgba(40, 40, 40, 255), stop:0.532663 rgba(29, 29, 29, 255));
-}</string>
-      </property>
       <property name="frameShape">
        <enum>QFrame::StyledPanel</enum>
       </property>
@@ -121,176 +70,31 @@ QScrollBar::sub-line:vertical {
        <item>
         <widget class="QFrame" name="title_frame">
          <property name="sizePolicy">
-          <sizepolicy hsizetype="Expanding" vsizetype="Maximum">
+          <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
            <horstretch>0</horstretch>
            <verstretch>0</verstretch>
           </sizepolicy>
          </property>
-         <property name="minimumSize">
-          <size>
-           <width>0</width>
-           <height>25</height>
-          </size>
-         </property>
          <property name="maximumSize">
           <size>
            <width>16777215</width>
-           <height>30</height>
+           <height>15</height>
           </size>
          </property>
+         <property name="layoutDirection">
+          <enum>Qt::LeftToRight</enum>
+         </property>
          <property name="frameShape">
-          <enum>QFrame::StyledPanel</enum>
+          <enum>QFrame::NoFrame</enum>
          </property>
          <property name="frameShadow">
           <enum>QFrame::Raised</enum>
          </property>
-         <widget class="QFrame" name="title_btns_frame">
-          <property name="geometry">
-           <rect>
-            <x>479</x>
-            <y>-5</y>
-            <width>100</width>
-            <height>31</height>
-           </rect>
-          </property>
-          <property name="styleSheet">
-           <string notr="true">QPushButton
-{
-	border: none;
-	border-radius: 8px;
-}</string>
-          </property>
-          <property name="frameShape">
-           <enum>QFrame::StyledPanel</enum>
-          </property>
-          <property name="frameShadow">
-           <enum>QFrame::Raised</enum>
-          </property>
-          <widget class="QPushButton" name="minimize_btn">
-           <property name="geometry">
-            <rect>
-             <x>54</x>
-             <y>10</y>
-             <width>16</width>
-             <height>16</height>
-            </rect>
-           </property>
-           <property name="minimumSize">
-            <size>
-             <width>16</width>
-             <height>16</height>
-            </size>
-           </property>
-           <property name="maximumSize">
-            <size>
-             <width>16</width>
-             <height>16</height>
-            </size>
-           </property>
-           <property name="toolTip">
-            <string>Minimize</string>
-           </property>
-           <property name="styleSheet">
-            <string notr="true">QPushButton
-{
-	background-color: rgb(255, 200, 0);
-}
-
-QPushButton:hover {
-	background-color: rgba(255, 200, 0, 220);
-}
-
-QPushButton:pressed
-{
-  background-color: rgba(255, 200, 0, 200);
-}
-
-QPushButton:disabled{
-  background-color: rgb(150, 150, 150);
-}</string>
-           </property>
-           <property name="text">
-            <string/>
-           </property>
-          </widget>
-          <widget class="QPushButton" name="exit_btn">
-           <property name="geometry">
-            <rect>
-             <x>80</x>
-             <y>10</y>
-             <width>16</width>
-             <height>16</height>
-            </rect>
-           </property>
-           <property name="minimumSize">
-            <size>
-             <width>16</width>
-             <height>16</height>
-            </size>
-           </property>
-           <property name="maximumSize">
-            <size>
-             <width>16</width>
-             <height>16</height>
-            </size>
-           </property>
-           <property name="toolTip">
-            <string>Exit</string>
-           </property>
-           <property name="styleSheet">
-            <string notr="true">QPushButton
-{
-	border: none;
-	border-radius: 8px;
-	background-color: rgb(255, 0, 0);
-}
-
-QPushButton:hover {
-	background-color: rgba(255, 0, 0, 220);
-}
-
-QPushButton:pressed
-{
-  background-color: rgba(255, 0, 0, 200);
-}
-
-QPushButton:disabled{
-  background-color: rgb(150, 150, 150);
-}</string>
-           </property>
-           <property name="text">
-            <string/>
-           </property>
-          </widget>
-         </widget>
-         <widget class="QLabel" name="title_label">
-          <property name="geometry">
-           <rect>
-            <x>160</x>
-            <y>-6</y>
-            <width>201</width>
-            <height>31</height>
-           </rect>
-          </property>
-          <property name="font">
-           <font>
-            <family>Roboto</family>
-            <pointsize>11</pointsize>
-            <weight>50</weight>
-            <italic>false</italic>
-            <bold>false</bold>
-           </font>
-          </property>
-          <property name="styleSheet">
-           <string notr="true"/>
-          </property>
-          <property name="text">
-           <string>Message</string>
-          </property>
-          <property name="alignment">
-           <set>Qt::AlignCenter</set>
-          </property>
-         </widget>
+         <layout class="QHBoxLayout" name="horizontalLayout">
+          <item>
+           <layout class="QVBoxLayout" name="dummy"/>
+          </item>
+         </layout>
         </widget>
        </item>
        <item>
@@ -304,30 +108,17 @@ QPushButton:disabled{
          <property name="minimumSize">
           <size>
            <width>0</width>
-           <height>50</height>
+           <height>60</height>
           </size>
          </property>
-         <property name="styleSheet">
-          <string notr="true">QComboBox {
-	color: rgb(255, 255, 255);
-	border: 2px solid  rgba(255, 255, 255, 100);
-	background-color: rgb(40, 40, 40);
-	text-align: center;
-	padding: 3px;
-}
-
-QComboBox QAbstractItemView {
-    selection-background-color: rgb(190, 0, 105);
-	background-color: rgb(40, 40, 40);
-}
-
-QComboBox:disabled{
-  color: rgb(95, 95, 95);
-  background-color: rgb(150, 150, 150);
-}</string>
+         <property name="maximumSize">
+          <size>
+           <width>16777215</width>
+           <height>60</height>
+          </size>
          </property>
          <property name="frameShape">
-          <enum>QFrame::StyledPanel</enum>
+          <enum>QFrame::NoFrame</enum>
          </property>
          <property name="frameShadow">
           <enum>QFrame::Raised</enum>
@@ -370,6 +161,12 @@ QComboBox:disabled{
              </sizepolicy>
             </property>
             <property name="minimumSize">
+             <size>
+              <width>60</width>
+              <height>60</height>
+             </size>
+            </property>
+            <property name="maximumSize">
              <size>
               <width>60</width>
               <height>60</height>
@@ -454,34 +251,11 @@ QComboBox:disabled{
          <property name="maximumSize">
           <size>
            <width>16777215</width>
-           <height>90</height>
+           <height>70</height>
           </size>
          </property>
-         <property name="styleSheet">
-          <string notr="true">QPushButton:hover:!pressed
-{
-  background-color: rgb(200, 0, 120);
-}
-
-QPushButton:hover:pressed
-{
-  background-color: rgb(180, 0, 100);
-}
-
-QPushButton{
-  background-color: rgb(190, 0, 105);
-  color: rgb(255, 255, 255);
-  border: unset;
-  border-radius: 4px;
-}
-
-QPushButton:disabled{
-  color: rgb(95, 95, 95);
-  background-color: rgb(150, 150, 150);
-}</string>
-         </property>
          <property name="frameShape">
-          <enum>QFrame::StyledPanel</enum>
+          <enum>QFrame::NoFrame</enum>
          </property>
          <property name="frameShadow">
           <enum>QFrame::Raised</enum>
@@ -514,7 +288,7 @@ QPushButton:disabled{
             <property name="minimumSize">
              <size>
               <width>100</width>
-              <height>30</height>
+              <height>35</height>
              </size>
             </property>
             <property name="maximumSize">
@@ -558,7 +332,7 @@ QPushButton:disabled{
             <property name="minimumSize">
              <size>
               <width>100</width>
-              <height>30</height>
+              <height>35</height>
              </size>
             </property>
             <property name="font">

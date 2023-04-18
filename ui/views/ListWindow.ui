@@ -38,50 +38,6 @@
   <property name="toolTipDuration">
    <number>-1</number>
   </property>
-  <property name="styleSheet">
-   <string notr="true">* {
-   color: rgb(255, 255, 255);
-}
-
-QStatusBar{
-  background-color: rgb(40, 40, 40);
-}
-
-QToolTip {
-  color: black;
-}
-
-QLabel {
-  color: rgb(255, 255, 255);
-}
-
-QScrollBar:vertical {              
-    border: unset;
-	background-color: qlineargradient(spread:pad, x1:0, y1:0, x2:1, y2:1, stop:0 rgba(40, 40, 40, 255), stop:0.532663 rgba(29, 29, 29, 255));
-    width:10px;    
-    margin: 0px 0px 0px 0px;
-}
-
-QScrollBar::handle:vertical {
-    border-radius: 4px;
-    background-color: rgb(190, 0, 105);
-    min-height: 0px;
-}
-
-QScrollBar::add-page:horizontal, QScrollBar::sub-page:horizontal,
-QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {
-    height: 0px;
-    background: none;
-}
-
-QScrollBar::add-line:vertical {
-    height: 0px;
-}
-
-QScrollBar::sub-line:vertical {
-    height: 0px;
-}</string>
-  </property>
   <property name="locale">
    <locale language="English" country="UnitedStates"/>
   </property>
@@ -104,13 +60,6 @@ QScrollBar::sub-line:vertical {
     </property>
     <item>
      <widget class="QFrame" name="main_frame">
-      <property name="styleSheet">
-       <string notr="true">#main_frame {
-	border: 1px solid rgb(124, 124, 124);
-	border-radius: 10px;
-	background-color: qlineargradient(spread:pad, x1:0, y1:0, x2:1, y2:1, stop:0 rgba(40, 40, 40, 255), stop:0.532663 rgba(29, 29, 29, 255));
-}</string>
-      </property>
       <property name="frameShape">
        <enum>QFrame::StyledPanel</enum>
       </property>
@@ -139,7 +88,7 @@ QScrollBar::sub-line:vertical {
           </size>
          </property>
          <property name="frameShape">
-          <enum>QFrame::StyledPanel</enum>
+          <enum>QFrame::NoFrame</enum>
          </property>
          <property name="frameShadow">
           <enum>QFrame::Raised</enum>
@@ -148,7 +97,7 @@ QScrollBar::sub-line:vertical {
           <property name="geometry">
            <rect>
             <x>3</x>
-            <y>1</y>
+            <y>4</y>
             <width>301</width>
             <height>21</height>
            </rect>
@@ -168,125 +117,6 @@ QScrollBar::sub-line:vertical {
           <property name="text">
            <string>List Window</string>
           </property>
-         </widget>
-         <widget class="QFrame" name="title_btns_frame">
-          <property name="geometry">
-           <rect>
-            <x>379</x>
-            <y>-7</y>
-            <width>111</width>
-            <height>31</height>
-           </rect>
-          </property>
-          <property name="styleSheet">
-           <string notr="true">QPushButton
-{
-	border: none;
-	border-radius: 8px;
-}</string>
-          </property>
-          <property name="frameShape">
-           <enum>QFrame::StyledPanel</enum>
-          </property>
-          <property name="frameShadow">
-           <enum>QFrame::Raised</enum>
-          </property>
-          <widget class="QPushButton" name="minimize_btn">
-           <property name="geometry">
-            <rect>
-             <x>54</x>
-             <y>10</y>
-             <width>16</width>
-             <height>16</height>
-            </rect>
-           </property>
-           <property name="minimumSize">
-            <size>
-             <width>16</width>
-             <height>16</height>
-            </size>
-           </property>
-           <property name="maximumSize">
-            <size>
-             <width>16</width>
-             <height>16</height>
-            </size>
-           </property>
-           <property name="toolTip">
-            <string>Minimize</string>
-           </property>
-           <property name="styleSheet">
-            <string notr="true">QPushButton
-{
-	background-color: rgb(255, 200, 0);
-}
-
-QPushButton:hover {
-	background-color: rgba(255, 200, 0, 220);
-}
-
-QPushButton:pressed
-{
-  background-color: rgba(255, 200, 0, 200);
-}
-
-QPushButton:disabled{
-  background-color: rgb(150, 150, 150);
-}</string>
-           </property>
-           <property name="text">
-            <string/>
-           </property>
-          </widget>
-          <widget class="QPushButton" name="exit_btn">
-           <property name="geometry">
-            <rect>
-             <x>80</x>
-             <y>10</y>
-             <width>16</width>
-             <height>16</height>
-            </rect>
-           </property>
-           <property name="minimumSize">
-            <size>
-             <width>16</width>
-             <height>16</height>
-            </size>
-           </property>
-           <property name="maximumSize">
-            <size>
-             <width>16</width>
-             <height>16</height>
-            </size>
-           </property>
-           <property name="toolTip">
-            <string>Exit</string>
-           </property>
-           <property name="styleSheet">
-            <string notr="true">QPushButton
-{
-	border: none;
-	border-radius: 8px;
-	background-color: rgb(255, 0, 0);
-}
-
-QPushButton:hover {
-	background-color: rgba(255, 0, 0, 220);
-}
-
-QPushButton:pressed
-{
-  background-color: rgba(255, 0, 0, 200);
-}
-
-QPushButton:disabled{
-  background-color: rgb(150, 150, 150);
-}</string>
-           </property>
-           <property name="text">
-            <string/>
-           </property>
-          </widget>
          </widget>
         </widget>
        </item>
@@ -308,7 +138,7 @@ QPushButton:disabled{
           <string notr="true"/>
          </property>
          <property name="frameShape">
-          <enum>QFrame::StyledPanel</enum>
+          <enum>QFrame::NoFrame</enum>
          </property>
          <property name="frameShadow">
           <enum>QFrame::Raised</enum>
@@ -342,27 +172,8 @@ QPushButton:disabled{
               <family>Roboto</family>
              </font>
             </property>
-            <property name="styleSheet">
-             <string notr="true">QListView {
-	color: rgb(255, 255, 255);
-	border: 2px solid  rgba(255, 255, 255, 100);
-	background-color: rgb(40, 40, 40);
-	text-align: center;
-	outline: none;
-	padding: 3px;
-}
-
-QListView::item:selected:!active {
-	color: rgb(255, 255, 255);
-}
-
-QListView::item:hover {
-	background-color: rgb(127, 0, 74);
-}
-
-QListView::item:selected {
-	background-color:  rgb(190, 0, 105);
-}</string>
+            <property name="frameShape">
+             <enum>QFrame::NoFrame</enum>
             </property>
             <property name="editTriggers">
              <set>QAbstractItemView::NoEditTriggers</set>
@@ -392,31 +203,8 @@ QListView::item:selected {
               <height>16777215</height>
              </size>
             </property>
-            <property name="styleSheet">
-             <string notr="true">QPushButton:hover:!pressed
-{
-  background-color: rgb(200, 0, 120);
-}
-
-QPushButton:hover:pressed
-{
-  background-color: rgb(180, 0, 100);
-}
-
-QPushButton{
-  background-color: rgb(190, 0, 105);
-  color: rgb(255, 255, 255);
-  border: unset;
-  border-radius: 4px;
-}
-
-QPushButton:disabled{
-  color: rgb(95, 95, 95);
-  background-color: rgb(150, 150, 150);
-}</string>
-            </property>
             <property name="frameShape">
-             <enum>QFrame::StyledPanel</enum>
+             <enum>QFrame::NoFrame</enum>
             </property>
             <property name="frameShadow">
              <enum>QFrame::Raised</enum>
@@ -439,7 +227,7 @@ QPushButton:disabled{
                <property name="minimumSize">
                 <size>
                  <width>100</width>
-                 <height>30</height>
+                 <height>35</height>
                 </size>
                </property>
                <property name="font">
@@ -476,7 +264,7 @@ QPushButton:disabled{
                <property name="minimumSize">
                 <size>
                  <width>100</width>
-                 <height>30</height>
+                 <height>35</height>
                 </size>
                </property>
                <property name="font">
@@ -517,7 +305,7 @@ QPushButton:disabled{
                <property name="minimumSize">
                 <size>
                  <width>100</width>
-                 <height>30</height>
+                 <height>35</height>
                 </size>
                </property>
                <property name="maximumSize">

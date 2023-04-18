@@ -1,7 +1,6 @@
 from PyQt5 import QtCore
 from PyQt5.QtCore import QUrl
 from PyQt5.QtWidgets import QWidget
-import qtawesome as qta
 from ui.handlers.WindowHandler import WindowHandler
 from ui.views.MainWindow import Ui_MainWindow
 from observed import observable_method
@@ -40,10 +39,6 @@ class MainWindowHandler(WindowHandler, QWidget):
             self.ui.platform_cmb_box.addItem(val)
         platform_idx = list(cm.platforms.keys()).index(cm.selected_platform)
         self.ui.platform_cmb_box.setCurrentIndex(platform_idx)
-
-        # actions buttons
-        self.ui.import_btn.setIcon(qta.icon('fa5s.file-import', color='white'))
-        self.ui.export_btn.setIcon(qta.icon('fa5s.file-export', color='white'))
     
     @QtCore.pyqtSlot()
     def game_select_action(self):

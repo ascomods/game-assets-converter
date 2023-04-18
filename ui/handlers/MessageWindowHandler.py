@@ -22,7 +22,7 @@ class MessageWindowHandler(WindowHandler, QWidget):
     def set_callback(self, callback):
         self.callback = callback
 
-    def set_message(self, m_type, title, message, yes_no = False):
+    def set_message(self, m_type, message, yes_no = False):
         if m_type == 'information':
             icon_pixmap = qta.icon('mdi.information', color='white') \
                 .pixmap(QtCore.QSize(50, 50))
@@ -42,7 +42,6 @@ class MessageWindowHandler(WindowHandler, QWidget):
             self.ui.horizontalLayout_5.removeItem(spacer)
             self.ui.yes_btn.setText('OK')
         self.ui.message_icon.setPixmap(icon_pixmap)
-        self.ui.title_label.setText(title)
         self.ui.message_label.setText(message)
 
     @QtCore.pyqtSlot()

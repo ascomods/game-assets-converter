@@ -1,0 +1,183 @@
+* {
+  color: rgb(255, 255, 255);
+}
+
+QStatusBar {
+  background-color: rgb(40, 40, 40);
+}
+
+QToolTip {
+  color: black;
+}
+
+QLabel {
+  color: rgb(255, 255, 255);
+}
+
+QScrollBar:vertical {
+  border: unset;
+  background-color: rgb(53, 53, 53);
+  width: 10px;
+  margin: 0px 0px 0px 0px;
+}
+
+QScrollBar:horizontal {
+  border: unset;
+  background-color: rgb(53, 53, 53);
+}
+
+QScrollBar::handle:vertical,
+QScrollBar::handle:horizontal {
+  border-radius: 4px;
+  background-color: rgb(217, 0, 126);
+  min-height: 0px;
+}
+
+QScrollBar::add-page:horizontal,
+QScrollBar::sub-page:horizontal,
+QScrollBar::add-page:vertical,
+QScrollBar::sub-page:vertical {
+  height: 0px;
+  background: none;
+}
+
+QScrollBar::add-line:vertical {
+  height: 0px;
+}
+
+QScrollBar::sub-line:vertical {
+  height: 0px;
+}
+
+QListView {
+	color: rgb(255, 255, 255);
+	border: 1px solid rgba(255, 255, 255, 100);
+	background-color: rgb(40, 40, 40);
+	text-align: center;
+	outline: none;
+}
+
+QListView::item {
+  height: 40px;
+}
+
+QListView::item:selected:!active {
+	color: rgb(255, 255, 255);
+}
+
+QListView::item:hover {
+	background-color: rgb(140, 0, 80);
+}
+
+QListView::item:selected,
+QTreeView::item:selected{
+	background-color: rgb(190, 0, 105);
+}
+
+QTreeView{
+  background-color: rgb(40, 40, 40);
+}
+
+QProgressBar {
+  background-color: rgb(40, 40, 40);
+  color: rgb(255, 255, 255);
+  border: 1px solid  rgba(255, 255, 255, 100);
+  text-align: center;
+}
+
+QProgressBar::chunk {
+  background-color: rgb(210, 0, 120);
+}
+
+QPushButton {
+  background-color: rgb(190, 0, 105);
+  color: rgb(255, 255, 255);
+  border: unset;
+}
+
+/* Input */
+
+QTextField {
+  background-color: rgb(40, 40, 40);
+}
+
+/* file dialog */
+
+QFileDialog {
+	color: rgb(255, 255, 255);
+	border: 1px solid rgba(255, 255, 255, 100);
+	background-color: rgb(40, 40, 40);
+}
+
+/* main_frame */
+
+#main_frame {
+  border: 1px solid rgb(124, 124, 124);
+  border-radius: 10px;
+  background-color: qlineargradient(spread:pad, x1:0, y1:0, x2:1, y2:1, stop:0 rgba(40, 40, 40, 255), stop:0.532663 rgba(29, 29, 29, 255));
+}
+
+/* actions_frame */
+
+#actions_frame QPushButton {
+  background-color: rgb(190, 0, 105);
+  color: rgb(255, 255, 255);
+  border: unset;
+  border-radius: 4px;
+}
+
+#actions_frame QPushButton:disabled {
+  color: rgb(95, 95, 95);
+  background-color: rgb(150, 150, 150);
+}
+
+#actions_frame QPushButton:hover:!pressed {
+  background-color: rgb(200, 0, 120);
+}
+
+#actions_frame QPushButton:hover:pressed {
+  background-color: rgb(180, 0, 100);
+}
+
+/* dropdowns */
+
+QComboBox {
+  color: rgb(255, 255, 255);
+  background-color: rgb(50, 50, 50);
+  selection-background-color: rgb(190, 0, 105);
+  border: 1px solid rgba(255, 255, 255, 100);
+  height: 30px;
+}
+
+QComboBox QFrame {
+  background-color: rgb(50, 50, 50);
+  border: 1px solid rgba(255, 255, 255, 100);
+}
+
+/* remove arrow */
+
+QComboBox::drop-down {
+  border: 0px;
+}
+
+QComboBox::down-arrow {
+  image: url('ui/resources/white-down-arrow.svg');
+  width: 10px;
+  margin-right: 11px;
+}
+
+QComboBox:disabled {
+  color: rgb(95, 95, 95);
+  background-color: rgb(150, 150, 150);
+}
+
+/* title_btns_frame */
+
+#title_btns_frame QPushButton {
+  border: none;
+  border-radius: 8px;
+}
+
+#title_btns_frame QPushButton:disabled {
+  background-color: rgb(150, 150, 150);
+}

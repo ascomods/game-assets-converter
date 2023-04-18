@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>400</width>
-    <height>100</height>
+    <height>130</height>
    </rect>
   </property>
   <property name="sizePolicy">
@@ -19,13 +19,13 @@
   <property name="minimumSize">
    <size>
     <width>400</width>
-    <height>100</height>
+    <height>130</height>
    </size>
   </property>
   <property name="maximumSize">
    <size>
-    <width>500</width>
-    <height>200</height>
+    <width>400</width>
+    <height>130</height>
    </size>
   </property>
   <property name="windowTitle">
@@ -37,70 +37,6 @@
   </property>
   <property name="toolTipDuration">
    <number>-1</number>
-  </property>
-  <property name="styleSheet">
-   <string notr="true">* {
-   color: rgb(255, 255, 255);
-}
-
-QStatusBar{
-  background-color: rgb(40, 40, 40);
-}
-
-QToolTip {
-  color: black;
-}
-
-QLabel {
-  color: rgb(255, 255, 255);
-}
-
-QListView {
- border: unset;
-}
-
-QListView::item:selected:!active {
-  color: rgb(255, 255, 255);
-}
-
-QListView::item:hover {
-  background-color: rgb(10, 89, 170);
-}
-
-QListView::item:selected {
-  background-color: rgb(11, 103, 198);
-}
-
-QListView{
-  outline: none;
-}
-
-QScrollBar:vertical {              
-    border: unset;
-    background-color: rgb(31, 38, 79);
-    width:10px;    
-    margin: 0px 0px 0px 0px;
-}
-
-QScrollBar::handle:vertical {
-    border-radius: 4px;
-    background-color: rgb(11, 95, 181);
-    min-height: 0px;
-}
-
-QScrollBar::add-page:horizontal, QScrollBar::sub-page:horizontal,
-QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {
-    height: 0px;
-    background: none;
-}
-
-QScrollBar::add-line:vertical {
-    height: 0px;
-}
-
-QScrollBar::sub-line:vertical {
-    height: 0px;
-}</string>
   </property>
   <property name="locale">
    <locale language="English" country="UnitedStates"/>
@@ -124,15 +60,8 @@ QScrollBar::sub-line:vertical {
     </property>
     <item>
      <widget class="QFrame" name="main_frame">
-      <property name="styleSheet">
-       <string notr="true">#main_frame {
-	border: 1px solid rgb(124, 124, 124);
-	border-radius: 10px;
-	background-color: qlineargradient(spread:pad, x1:0, y1:0, x2:1, y2:1, stop:0 rgba(40, 40, 40, 255), stop:0.532663 rgba(29, 29, 29, 255));
-}</string>
-      </property>
       <property name="frameShape">
-       <enum>QFrame::StyledPanel</enum>
+       <enum>QFrame::NoFrame</enum>
       </property>
       <property name="frameShadow">
        <enum>QFrame::Raised</enum>
@@ -159,7 +88,7 @@ QScrollBar::sub-line:vertical {
           </size>
          </property>
          <property name="frameShape">
-          <enum>QFrame::StyledPanel</enum>
+          <enum>QFrame::NoFrame</enum>
          </property>
          <property name="frameShadow">
           <enum>QFrame::Raised</enum>
@@ -209,7 +138,7 @@ QScrollBar::sub-line:vertical {
           <string notr="true"/>
          </property>
          <property name="frameShape">
-          <enum>QFrame::StyledPanel</enum>
+          <enum>QFrame::NoFrame</enum>
          </property>
          <property name="frameShadow">
           <enum>QFrame::Raised</enum>
@@ -253,20 +182,6 @@ QScrollBar::sub-line:vertical {
               <stylestrategy>PreferDefault</stylestrategy>
               <kerning>true</kerning>
              </font>
-            </property>
-            <property name="styleSheet">
-             <string notr="true">QProgressBar
-{
-	background-color: rgb(40, 40, 40);
-	color: rgb(255, 255, 255);
-	border: 2px solid  rgba(255, 255, 255, 100);
-	text-align: center;
-}
-
-QProgressBar::chunk
-{
-	background-color: rgb(210, 0, 120);
-}</string>
             </property>
             <property name="value">
              <number>0</number>

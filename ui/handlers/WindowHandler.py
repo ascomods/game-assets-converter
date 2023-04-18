@@ -1,5 +1,7 @@
-from PyQt5 import QtCore
-from PyQt5.QtWidgets import QWidget
+import os
+import core.common as cm
+from PyQt5 import QtCore, QtGui
+from PyQt5.QtWidgets import QWidget, QDesktopWidget, QMainWindow
 from observed import observable_method
 
 class WindowHandler():
@@ -9,14 +11,22 @@ class WindowHandler():
         super().__init__()
         self.window = window
         self.title = title
-    
+
     def init_ui(self):
+        # set stylesheet
+        self.window.setStyleSheet(cm.stylesheet)
+        # remove borders and background
+        self.window.setWindowFlags(QtCore.Qt.FramelessWindowHint)
+        self.window.setAttribute(QtCore.Qt.WA_TranslucentBackground)
+
         if hasattr(self.ui, 'title_label') and self.title != '':
             self.ui.title_label.setText(self.title)
 
-        # remove borders
-        self.window.setWindowFlag(QtCore.Qt.FramelessWindowHint)
-        self.window.setAttribute(QtCore.Qt.WA_TranslucentBackground)
+        # center window
+        desktop_widget = QDesktopWidget()
+        x = (desktop_widget.width() - self.window.width()) / 2
+        y = (desktop_widget.height() - self.window.height()) / 2
+        self.window.move(x, y)
 
         # make window moveable
         if hasattr(self.ui, 'title_frame'):
@@ -29,7 +39,7 @@ class WindowHandler():
                 self.ui.minimize_btn.clicked.connect(self.window.showMinimized)
             if hasattr(self.ui, 'exit_btn'):
                 self.ui.exit_btn.clicked.connect(self.notify_exit_action)
-
+    
     def disable_elements(self, elements = []):
         if elements == []:
             elements = self.toggleable_elements

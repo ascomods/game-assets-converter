@@ -5,6 +5,7 @@ from ui.handlers.ListWindowHandler import ListWindowHandler
 from ui.handlers.MainWindowHandler import MainWindowHandler
 from ui.handlers.ProgressWindowHandler import ProgressWindowHandler
 from ui.handlers.MessageWindowHandler import MessageWindowHandler
+from PyQt5 import QtCore
 
 class ViewHandler():
     observers = {}
@@ -51,11 +52,12 @@ class ViewHandler():
                                 identify_observed=True)
                             break
 
-    def load_window(self, handler_class, is_child = True, title = '', callbacks = None):
+    def load_window(self, handler_class, title = '', callbacks = None):
         if hasattr(self, 'window_handler'):
             self.parent_handler = self.window_handler
-        if hasattr(self, 'window') and is_child:
-            self.window = QtWidgets.QMainWindow(self.window)
+        if hasattr(self, 'window'):
+            self.window.setWindowFlags(QtCore.Qt.WindowStaysOnTopHint)
+            self.window = QtWidgets.QMainWindow()
         else:
             self.window = QtWidgets.QMainWindow()
         self.window_handler = eval(handler_class)(self.window, title)
@@ -65,14 +67,13 @@ class ViewHandler():
             for function, params in callbacks.items():
                 eval(function)(params)
         self.window.show()
-    
-    def show_message_dialog(self, message, type = 'information', title = '', 
-        callback = None, yes_no = False):
+
+    def show_message_dialog(self, message, type = 'information', callback = None, yes_no = False):
         """
         Possible types : 'information', 'warning', 'critical', 'question'
         """
         self.load_window('MessageWindowHandler')
-        self.window_handler.set_message(type, title, message, yes_no)
+        self.window_handler.set_message(type, message, yes_no)
         if callback != None:
             self.window_handler.set_callback(callback)
     
