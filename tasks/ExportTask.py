@@ -283,12 +283,18 @@ class ExportTask(Task):
 
                     if(matrixToDisplay["inv_transformMatrix"]):
                         datasXml += createBoneNodeXml_recur_Matrix("InverseTransformMatrix", node_tmp.inv_transform)
-                        #if(matrixToDisplay["ConvertInTransform"]): #Todo
-                        # Todo look at the differencies with Inv and Abs Matrix (only position but why ?)
+                        if(matrixToDisplay["ConvertInTransform"]):
+                            posOrientScale = ut.makeTransformFromMatrix4x4(node_tmp.inv_transform)
+                            rotation = ut.makeTranformRotationFromTransformOrientation(posOrientScale[1])
+                            datasXml += createBoneNodeXml_recur_TransformRot("InvTr", [posOrientScale[0], rotation, posOrientScale[2]] )
 
+                        
                     if(matrixToDisplay["rel_transformMatrix"]):
                         datasXml += createBoneNodeXml_recur_Matrix("RelativeTransformMatrix", node_tmp.rel_transform)
-                        #if(matrixToDisplay["ConvertInTransform"]): #Todo
+                        if(matrixToDisplay["ConvertInTransform"]):
+                            posOrientScale = ut.makeTransformFromMatrix4x4(node_tmp.rel_transform)
+                            rotation = ut.makeTranformRotationFromTransformOrientation(posOrientScale[1])
+                            datasXml += createBoneNodeXml_recur_TransformRot("RelTr", [posOrientScale[0], rotation, posOrientScale[2]] )
 
                     if(matrixToDisplay["transform1_2"]):
                         t = node_tmp.transform1
@@ -306,6 +312,13 @@ class ExportTask(Task):
                         datasXml += indent +'\t\t\t<Line x="'+ str(matrix3x3[1][0]) +'" y="'+ str(matrix3x3[1][1]) +'" z="'+ str(matrix3x3[1][2]) +'" />\n'
                         datasXml += indent +'\t\t\t<Line x="'+ str(matrix3x3[2][0]) +'" y="'+ str(matrix3x3[2][1]) +'" z="'+ str(matrix3x3[2][2]) +'" />\n'
                         datasXml += indent +'\t\t</Matrix3>\n'
+
+                        if(matrixToDisplay["ConvertInTransform"]):
+                            matrix4x4_tmp = [[t[2][1], t[3][1], t[0][2], 0], [t[1][2], t[2][2], t[3][2], 0], [t[0][3], t[1][3], t[2][3], 0], [0,0,0,1] ]
+                            posOrientScale = ut.makeTransformFromMatrix4x4(matrix4x4_tmp)
+                            rotation = ut.makeTranformRotationFromTransformOrientation(posOrientScale[1])
+                            datasXml += indent +'\t\t<Rotation x="'+ str(rotation[0]) +'" y="'+ str(rotation[1]) +'" z="'+ str(rotation[2]) +'" />\n'
+
                         datasXml += indent +'\t\t<UnknowScale value="'+ str(scale) +'" />\n'
                         datasXml += indent +'\t</Transf_1>\n'
 

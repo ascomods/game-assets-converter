@@ -155,7 +155,6 @@ class FBX:
             fbx.FbxAxisSystem.eRightHanded
         )   
         scene.GetGlobalSettings().SetAxisSystem(axis_system)
-        #scene.GetGlobalSettings().SetSystemUnit(fbx.FbxSystemUnit(100.0, 1.0)) # 1 unit in spr == 100m in game/blender/3dsmax/others games
         scene.GetGlobalSettings().SetSystemUnit(fbx.FbxSystemUnit.m)
         scene.GetGlobalSettings().SetTimeMode = fbx.FbxTime.eFrames60  # 60 Fps (Frames by Second) => not in python
         #fbx_manager.GetIOSettings().SetIntProp(fbx.EXP_FBX_COMPRESS_LEVEL, 9)  #Todo uncomment
@@ -421,6 +420,7 @@ class FBX:
             'materials': []
         }
 
+        nodeAbsMatrix = node.EvaluateGlobalTransform()
 
 
 
@@ -472,6 +472,8 @@ class FBX:
 
         # Notice: the list of colors (or normals) don't depend of MappingMode: eByControlPoint or eByPolygon. 
         # it's just the number of values will be not the same. 
+
+
         
         # VertexColor 
         colors = []
@@ -510,7 +512,6 @@ class FBX:
                 listValues = normals_Fbx.GetDirectArray()
 
                 nbElements = listIndex.GetCount()
-                defaultVal = [0,0,0,0]
 
                 nbValues = listValues.GetCount()
                 for j in range(nbElements):
@@ -518,7 +519,7 @@ class FBX:
                     if (index < nbValues):
                         listNormals.append(listValues.GetAt(index))
                     else:
-                        listNormals.append( defaultVal )
+                        listNormals.append( fbx.FbxVector4(0,0,0,0) )
             else:
                 for val in normals_Fbx.GetDirectArray():
                     listNormals.append(val)
@@ -536,7 +537,6 @@ class FBX:
                 listValues = binormals_Fbx.GetDirectArray()
 
                 nbElements = listIndex.GetCount()
-                defaultVal = [0,0,0,0]
 
                 nbValues = listValues.GetCount()
                 for j in range(nbElements):
@@ -544,7 +544,7 @@ class FBX:
                     if (index < nbValues):
                         listBinormals.append(listValues.GetAt(index))
                     else:
-                        listBinormals.append( defaultVal )
+                        listBinormals.append( fbx.FbxVector4(0,0,0,0) )
             else:
                 for val in binormals_Fbx.GetDirectArray():
                     listBinormals.append(val)
@@ -562,7 +562,6 @@ class FBX:
                 listValues = tangents_Fbx.GetDirectArray()
 
                 nbElements = listIndex.GetCount()
-                defaultVal = [0,0,0,0]
 
                 nbValues = listValues.GetCount()
                 for j in range(nbElements):
@@ -570,7 +569,7 @@ class FBX:
                     if (index < nbValues):
                         listTangents.append(listValues.GetAt(index))
                     else:
-                        listTangents.append( defaultVal )
+                        listTangents.append( fbx.FbxVector4(0,0,0,0) )
             else:
                 for val in tangents_Fbx.GetDirectArray():
                     listTangents.append(val)
@@ -637,9 +636,9 @@ class FBX:
             vertices[i]["blendIndices"] = []
             vertices[i]["blendWeights"] = []
 
-            #TODO: if someone move/rotate/scale the mesh's node instead of doing it on vertex, you got to deal with transform of Node
 
             vect4_tmp = mesh.GetControlPointAt(i)
+            vect4_tmp = nodeAbsMatrix.MultT(vect4_tmp)           #if someone move/rotate/scale the mesh's node instead of doing it on vertex, you got to deal with transform of Node
             vertices[i]["position"] = {'x': vect4_tmp[0], 'y': vect4_tmp[1], 'z': vect4_tmp[2], 'w': 1.0}   # vect4_tmp.w = 1.0 because it's lost in FBX
             
             # here we only do the eByControlPoint (or fill default value), eByPolygon will be done after.
@@ -656,6 +655,7 @@ class FBX:
                 for j in range(len(normals)):
                     if(normals[j]["mapping"]==fbx.FbxLayerElement.eByControlPoint):
                         vect4_tmp = normals[j]["list"][i]
+                        vect4_tmp = nodeAbsMatrix.MultT(vect4_tmp) - nodeAbsMatrix.MultT(fbx.FbxVector4(0,0,0,1))          #if someone move/rotate/scale the mesh's node instead of doing it on vertex, you got to deal with transform of Node. here me remove position due to matrix
                         vertices[i]["normal"].append( {'x': vect4_tmp[0], 'y': vect4_tmp[1], 'z': vect4_tmp[2], 'w': vect4_tmp[3]} )
                     else:
                         vertices[i]["normal"].append( {'x': 0, 'y': 0, 'z': 0, 'w': 0} )
@@ -665,6 +665,7 @@ class FBX:
                 for j in range(len(binormals)):
                     if(binormals[j]["mapping"]==fbx.FbxLayerElement.eByControlPoint):
                         vect4_tmp = binormals[j]["list"][i]
+                        vect4_tmp = nodeAbsMatrix.MultT(vect4_tmp) - nodeAbsMatrix.MultT(fbx.FbxVector4(0,0,0,1) )          #if someone move/rotate/scale the mesh's node instead of doing it on vertex, you got to deal with transform of Node. here me remove position due to matrix
                         vertices[i]["binormal"].append( {'x': vect4_tmp[0], 'y': vect4_tmp[1], 'z': vect4_tmp[2], 'w': vect4_tmp[3]})
                     else:
                         vertices[i]["binormal"].append( {'x': 0, 'y': 0, 'z': 0, 'w': 0})
@@ -674,6 +675,7 @@ class FBX:
                 for j in range(len(tangents)):
                     if(tangents[j]["mapping"]==fbx.FbxLayerElement.eByControlPoint):
                         vect4_tmp = tangents[j]["list"][i]
+                        vect4_tmp = nodeAbsMatrix.MultT(vect4_tmp) - nodeAbsMatrix.MultT(fbx.FbxVector4(0,0,0,1) )          #if someone move/rotate/scale the mesh's node instead of doing it on vertex, you got to deal with transform of Node. here me remove position due to matrix
                         vertices[i]["tangent"].append( {'x': vect4_tmp[0], 'y': vect4_tmp[1], 'z': vect4_tmp[2], 'w': vect4_tmp[3]})
                     else:
                         vertices[i]["tangent"].append( {'x': 0, 'y': 0, 'z': 0, 'w': 0})
