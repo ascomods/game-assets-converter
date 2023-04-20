@@ -5,6 +5,7 @@ import numpy as np
 import math
 import re
 import os
+import copy
 import core.utils as ut
 import core.common as cm
 import core.commands as cmd
@@ -17,10 +18,8 @@ class FBX:
     remove_duplicate_vertex = True
     remove_triangle_strip = True
     use_fbx_face_optimisation = False
-    use_per_vertex = True
+    use_per_vertex = not cm.use_blender
     version_from_vertices_list = True
-    debug_mode = False
-    use_blender = False
 
     colors_components = ['r', 'g', 'b', 'a']
     others_components = ['x', 'y', 'z', 'w']
@@ -160,10 +159,10 @@ class FBX:
         (fbx_manager, scene) = FbxCommon.InitializeSdkObjects()
         
         self.handle_data(fbx_manager, scene)
-        if not self.debug_mode:
+        if not cm.use_debug_mode:
             fbx_manager.GetIOSettings().SetIntProp(fbx.EXP_FBX_COMPRESS_LEVEL, 9)
         FbxCommon.SaveScene(fbx_manager, scene, "output.fbx", 0)
-        if self.debug_mode:
+        if cm.use_debug_mode:
             FbxCommon.SaveScene(fbx_manager, scene, "output.fbx.txt", 1)
 
         fbx_manager.Destroy()
@@ -339,7 +338,7 @@ class FBX:
             else:
                 for val in layer.GetDirectArray():
                     values.append(val)
-            data.append(values)
+            data.append({"list": values, "mapping": layer.GetMappingMode()})
 
         return data
 
@@ -349,8 +348,8 @@ class FBX:
         # ------------------------------------------------ 
         # Merge all vertex informations to get just a list of vertex (more easy to deal with)
         # ------------------------------------------------ 
-        #
-        # TODO: do the version with data from PerPolygon (not only from perVertex)
+
+        use_per_polygone_values = not self.use_per_vertex
 
         name = mesh.GetName()
         vertices = []
@@ -417,7 +416,6 @@ class FBX:
         }
 
         components_map = {'uv': self.uvs_components, 'color': self.colors_components}
-
         param_names = ['color', 'normal', 'binormal', 'tangent', 'uv', 'blend_indices', 'blend_weights']
         for i in range(nb_vertex):
             vertices.append({})
@@ -427,12 +425,18 @@ class FBX:
             vertices[i]['position'] = dict(zip(self.others_components, mesh.GetControlPointAt(i)))
             vertices[i]['position']['w'] = 1.0
 
+            # (Olganix) here we only do the eByControlPoint (or fill default value), eByPolygon will be done after.
             for param, layer in layers_dict.items():
+                components = components_map[param] if (param in components_map) else self.others_components
                 for layer_data in layer:
-                    components = components_map[param] if (param in components_map) else self.others_components
-                    if (param == 'uv'):
-                        layer_data[i] = (layer_data[i][0], (1.0 - layer_data[i][1]))
-                    vertices[i][param].append(dict(zip(components, layer_data[i])))
+                    if (layer_data['mapping'] == fbx.FbxLayerElement.eByControlPoint):
+                        if (param == 'uv'):
+                            layer_data[i] = (layer_data[i][0], (1.0 - layer_data[i][1]))
+                        vertices[i][param].append(dict(zip(components, layer_data[i])))
+                    else:
+                        vertices[i][param].append(dict(zip(components, [0 for x in range(len(components))])))
+                        use_per_polygone_values = ((use_per_polygone_values) or \
+                                                   (layer_data['mapping'] == fbx.FbxLayerElement.eByPolygon))
 
             blends = blend_by_vertex[i]
             # Apparently we have to order by weight (bigger first), and for the same weight, order by index
@@ -469,10 +473,37 @@ class FBX:
                                         new_vertices.index(vertices[idx2])])
             vertices = new_vertices
         else:
+            new_vertices_per_poly = []
             for i in range(mesh.GetPolygonCount()):
-                faces_triangles.append( [mesh.GetPolygonVertex(i, 0), mesh.GetPolygonVertex(i, 1), mesh.GetPolygonVertex(i, 2)])
+                face = [mesh.GetPolygonVertex(i, 0), mesh.GetPolygonVertex(i, 1), mesh.GetPolygonVertex(i, 2)]
 
-        if self.debug_mode:
+                # (Olganix) Here we do the eByPolygon
+                if use_per_polygone_values:
+                    for k in range(3):
+                        # Clone vertex
+                        new_vertex = copy.deepcopy(vertices[face[k]])
+
+                        for param, layer in layers_dict.items():
+                            components = components_map[param] if (param in components_map) else self.others_components
+                            for j in range(len(layer)):
+                                if (param == 'uv'):
+                                    uv = layer[j]['list'][i * 3 + k]
+                                    new_vertex[param][j] = dict(zip(components, [uv[0], (1.0 - uv[1])]))
+                                else:
+                                    new_vertex[param][j] = dict(zip(components, layer[j]['list'][i * 3 + k]))
+
+                        if (new_vertex not in new_vertices_per_poly):
+                            new_index = len(new_vertices_per_poly)
+                            new_vertices_per_poly.append(new_vertex)
+                        else:
+                            new_index = new_vertices_per_poly.index(new_vertex)
+                        face[k] = new_index
+                faces_triangles.append(face)
+
+        if (use_per_polygone_values):
+            vertices = new_vertices_per_poly
+
+        if cm.use_debug_mode:
             self.create_mesh_debug_xml("10_ImportedFromFbx", name.replace(":", "_"), vertices, faces_triangles)
 
         # TODO maybe add a part to optimize the vertex and face before making triangle strip (depend of optimisation of 3dsmax / blender)
@@ -504,7 +535,7 @@ class FBX:
             )
 
         faces_triangles = new_faces_triangles
-        if self.debug_mode:
+        if cm.use_debug_mode:
             self.create_mesh_debug_xml("11_MakingTriangleStrip", name.replace(":", "_"), vertices, faces_triangles)
 
         # -------------------------------------------------------------------------------------------------------------
@@ -527,7 +558,7 @@ class FBX:
             
             vertices = new_vertices
             faces_triangles = new_faces_triangles
-            if self.debug_mode:
+            if cm.use_debug_mode:
                 self.create_mesh_debug_xml("12_TriangleStripOnVertex", name.replace(":", "_"), vertices, faces_triangles)
 
         # ------------------------------------------------ 
@@ -584,7 +615,7 @@ class FBX:
 
                     if isinstance(source_obj, fbx.FbxLayeredTexture):
                         name = texture.GetName()
-                    elif self.use_blender:
+                    elif cm.use_blender:
                         name = material.GetName().split(':')[-1].split('.')[0]
                     else:
                         name = material.GetName()
@@ -717,7 +748,7 @@ class FBX:
             else:
                 faces_triangles.append([i, i + 2, i + 1])
         
-        if self.debug_mode:
+        if cm.use_debug_mode:
             self.create_mesh_debug_xml("00_SprOriginal", mesh.GetName().replace(":", "_"), vertices, faces_triangles)
 
         # ------------------------------------------------ 
@@ -789,7 +820,7 @@ class FBX:
             faces_triangles = new_faces_triangles
 
             # So now the triangle strip is only on face index, we got the same, but we reduce vertex number
-            if self.debug_mode:
+            if cm.use_debug_mode:
                 self.create_mesh_debug_xml("01_VertexReduced", mesh.GetName().replace(":", "_"), vertices, faces_triangles)
 
         # ------------------------------------------------
@@ -808,9 +839,9 @@ class FBX:
                 if ((triangle[0] != triangle[1]) and (triangle[0] != triangle[2]) and (triangle[1] != triangle[2])):
                     # So keep only triangles with 3 differents index.
                     new_faces_triangles.append(triangle)
-            
+
             faces_triangles = new_faces_triangles
-            if self.debug_mode:
+            if cm.use_debug_mode:
                 self.create_mesh_debug_xml("02_RemoveStripDegen", mesh.GetName().replace(":", "_"), vertices, faces_triangles)
 
         # ------------------------------------------------
@@ -1014,8 +1045,8 @@ class FBX:
         for material in self.data['material']:
             if (ut.b2s_name(material.name) == material_name) or \
                (material_name in ut.b2s_name(material.name)):
-                material.data.sort(self.use_blender)
-                if self.use_blender:
+                material.data.sort(cm.use_blender)
+                if cm.use_blender:
                     for i in range(0, len(material.data.layers)):
                         layer = material.data.layers[i]
 

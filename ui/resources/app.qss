@@ -101,12 +101,20 @@ QTextField {
   background-color: rgb(40, 40, 40);
 }
 
-/* file dialog */
+/* checkbox */
 
-QFileDialog {
-	color: rgb(255, 255, 255);
-	border: 1px solid rgba(255, 255, 255, 100);
-	background-color: rgb(40, 40, 40);
+QCheckBox::indicator {
+  width: 20px;
+  height: 20px;
+  margin-right: 6px;
+}
+
+QCheckBox::indicator:!checked {
+  image: url('ui/resources/white-checkbox.svg');
+}
+
+QCheckBox::indicator:checked {
+  image: url('ui/resources/white-checkbox-checked.svg');
 }
 
 /* main_frame */

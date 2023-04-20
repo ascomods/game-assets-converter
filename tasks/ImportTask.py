@@ -60,6 +60,9 @@ class ImportTask(Task):
                 self.save_file('ioram', self.ioram_path, True)
                 self.save_file('vram', self.vram_path, True)
 
+            # return to app dir
+            os.chdir(cm.app_path)
+
             self.result_signal.emit(self.__class__.__name__)
             self.finish_signal.emit()
         except Exception as e:

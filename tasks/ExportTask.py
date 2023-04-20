@@ -59,7 +59,10 @@ class ExportTask(Task):
                     i += 1
             else:
                 self.export_spr()
-            
+
+            # return to app dir
+            os.chdir(cm.app_path)
+
             self.result_signal.emit(self.__class__.__name__)
             self.finish_signal.emit()
         except Exception as e:

@@ -20,10 +20,15 @@ class MainWindowHandler(WindowHandler, QWidget):
         self.ui = Ui_MainWindow()
         self.ui.setupUi(self.window)
         self.init_ui()
+
         self.ui.game_cmb_box.currentIndexChanged.connect(self.game_select_action)
         self.ui.platform_cmb_box.currentIndexChanged.connect(self.platform_select_action)
+
         self.ui.import_btn.clicked.connect(self.notify_import_action)
         self.ui.export_btn.clicked.connect(self.notify_export_action)
+
+        self.ui.blender_chk_box.clicked.connect(self.set_use_blender)
+        self.ui.debug_chk_box.clicked.connect(self.set_use_debug_mode)
     
     def init_ui(self):
         super().init_ui()
@@ -39,6 +44,10 @@ class MainWindowHandler(WindowHandler, QWidget):
             self.ui.platform_cmb_box.addItem(val)
         platform_idx = list(cm.platforms.keys()).index(cm.selected_platform)
         self.ui.platform_cmb_box.setCurrentIndex(platform_idx)
+
+        # checkboxes
+        self.ui.blender_chk_box.setChecked(cm.use_blender)
+        self.ui.debug_chk_box.setChecked(cm.use_debug_mode)
     
     @QtCore.pyqtSlot()
     def game_select_action(self):
@@ -57,3 +66,19 @@ class MainWindowHandler(WindowHandler, QWidget):
     @observable_method()
     def notify_export_action(self, arg):
         pass
+
+    @QtCore.pyqtSlot()
+    def set_use_blender(self):
+        if cm.use_blender != None:
+            cm.use_blender = not cm.use_blender
+        else:
+            cm.use_blender = False
+        cm.settings.setValue("Blender", cm.use_blender)
+
+    @QtCore.pyqtSlot()
+    def set_use_debug_mode(self):
+        if cm.use_debug_mode != None:
+            cm.use_debug_mode = not cm.use_debug_mode
+        else:
+            cm.use_debug_mode = False
+        cm.settings.setValue("Debug", cm.use_debug_mode)
