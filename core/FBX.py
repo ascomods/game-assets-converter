@@ -25,6 +25,14 @@ class FBX:
     others_components = ['x', 'y', 'z', 'w']
     uvs_components = ['u', 'v']
 
+    # To access FBXColor properties
+    color_prop_map = {
+        'r': 'mRed',
+        'b': 'mBlue',
+        'g': 'mGreen',
+        'a': 'mAlpha'
+    }
+
     params_map = {
         'positions': 'position',
         'colors': 'color',
@@ -489,6 +497,14 @@ class FBX:
                                 if (param == 'uv'):
                                     uv = layer[j]['list'][i * 3 + k]
                                     new_vertex[param][j] = dict(zip(components, [uv[0], (1.0 - uv[1])]))
+                                elif (param == 'color'):
+                                    # use color prop map to retrieve r,g,b,a from FBXColor
+                                    color = layer[j]['list'][i * 3 + k]
+                                    new_color = []
+                                    for c in components:
+                                        prop = self.color_prop_map[c]
+                                        new_color.append(eval(f"color.{prop}"))
+                                    new_vertex[param][j] = dict(zip(components, new_color))
                                 else:
                                     new_vertex[param][j] = dict(zip(components, layer[j]['list'][i * 3 + k]))
 
@@ -669,7 +685,7 @@ class FBX:
                 layer = mesh.GetLayer(i)
 
             for j in range(len(layers[i]['data'])):
-                if param == 'uv':
+                if (param == 'uv'):
                     fbx_layer.GetDirectArray().Add(fbx.FbxVector2(layers[i]['data'][j][0], 1.0 - layers[i]['data'][j][1]))
                 else:
                     fbx_layer.GetDirectArray().Add(fbx.FbxVector4(*layers[i]['data'][j]))

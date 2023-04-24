@@ -523,7 +523,8 @@ class SPRPDataEntry:
     def sort(self, reverse = False):
         names = []
         for child in self.children:
-            names.append(child.name)
+            if child.name not in names:
+                names.append(child.name)
         names = natsorted(names, reverse=reverse)
 
         children = []

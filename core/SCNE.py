@@ -64,9 +64,8 @@ class SCNE:
     def load_data(self, data):
         self.unknown0x00 = data['unknown0x00']
         self.data_type = ut.s2b_name(data['data_type'])
-        #self.name = ut.s2b_name(data['name'])
-        #self.layer_name = ut.s2b_name(data['layer_name'])
-        #self.parent_name = ut.s2b_name(data['parent_name'])
+        self.layer_name = ut.s2b_name(data['layer_name'])
+        self.parent_name = ut.s2b_name(data['parent_name'])
 
     def get_data(self):
         data = copy.deepcopy(vars(self))

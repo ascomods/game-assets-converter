@@ -484,20 +484,16 @@ class ImportTask(Task):
                     string_list.append(name)
                     layer_node = SPRPDataEntry(b'SCNE', name, spr_object.string_table)
                     scne_layers_entry.children.append(layer_node)
-                # if '[LAYERS]' in loaded_dict['SCNE'].keys():
-                #     if 'children' in loaded_dict['SCNE']['[LAYERS]'].keys():
-                #         for key, content in loaded_dict['SCNE']['[LAYERS]']['children'].items():
-                #             key = ut.s2b_name(key)
-                #             if key not in layer_names:
-                #                 string_list.append(key)
-                #                 layer_node = SPRPDataEntry(b'SCNE', key, spr_object.string_table)
-                #                 scne_layers_entry.children.append(layer_node)
+                    # Adding missing layers using SCNE.json
+                    if '[LAYERS]' in loaded_dict['SCNE'].keys():
+                        if 'children' in loaded_dict['SCNE']['[LAYERS]'].keys():
+                            for key, content in loaded_dict['SCNE']['[LAYERS]']['children'].items():
+                                key = ut.s2b_name(key)
+                                if key not in layer_names:
+                                    string_list.append(key)
+                                    layer_node = SPRPDataEntry(b'SCNE', key, spr_object.string_table)
+                                    scne_layers_entry.children.append(layer_node)
                 scne_layers_entry.sort()
-
-                string_list.append(b'[NODES]')
-                scne_nodes_entry = SPRPDataEntry(b'SCNE', b'[NODES]', spr_object.string_table)
-                #scne_nodes_entry.children = scne_parts.values()
-                #scne_nodes_entry.sort(True)
 
                 for node_name, node in fbx_object.other_nodes.items():
                     layered_mesh_name = node_name
@@ -529,7 +525,7 @@ class ImportTask(Task):
                     if 'SCNE' not in spr.keys():
                         spr['SCNE'] = SPRPEntry(spr_object.string_table, b'SCNE')
 
-                    # SCNE Transform
+                    # # SCNE Transform
                     # for i in range(len(parents)):
                     #     name = parents[i].GetName()
                     #     layer_name, full_name = self.format_name(name)
@@ -617,7 +613,7 @@ class ImportTask(Task):
                     #         shapes[shape_name] = spr_shape_entry
 
 
-                    # SCNE Shape
+                    # # SCNE Shape
                     # print(scene_shape_name)
                     # if (scene_shape_name != b'') and (scene_shape_name not in scne_parts.keys()):
                     #     string_list.append(shape_name)
@@ -635,7 +631,47 @@ class ImportTask(Task):
                     # if shape_name != b'':
                     #     shapes[shape_name] = ''
 
-                scne_nodes_entry.children = scne_parts.values()
+                string_list.append(b'[NODES]')
+                scne_nodes_entry = SPRPDataEntry(b'SCNE', b'[NODES]', spr_object.string_table)
+                
+                if '[NODES]' in loaded_dict['SCNE'].keys():
+                    #scne_nodes = []
+
+                    # Use nodes from SCNE.json to fix blender scene nodes
+                    if cm.use_blender:
+                        new_scne_parts = {}
+                        for loaded_key, loaded_node in loaded_dict['SCNE']['[NODES]']['children'].items():
+                            loaded_key = ut.s2b_name(loaded_key)
+                            string_list.append(loaded_key)
+                            for scne_key, scne_node in scne_parts.items():
+                                name_part = b'|' + loaded_key.split(b'|')[-1]
+                                if (scne_key == name_part) and (loaded_key not in new_scne_parts):
+                                    new_scne_parts[loaded_key] = scne_node
+                                    new_scne_parts[loaded_key].name = loaded_key
+                                    new_scne_parts[loaded_key].data.load_data(loaded_node['data'])
+                                    string_list.append(new_scne_parts[loaded_key].data.data_type)
+                                    string_list.append(new_scne_parts[loaded_key].data.parent_name)
+                                    string_list.remove(scne_key)
+                                    del scne_parts[scne_key]
+                                    break
+                            # Adding missing transforms
+                            if (loaded_key not in new_scne_parts) and (loaded_node['data']['data_type'] == 'transform'):
+                                new_scne_parts[loaded_key] = SPRPDataEntry(b'SCNE', loaded_key, spr_object.string_table)
+                                new_scne_parts[loaded_key].data = SCNE('', b'', spr_object.string_table)
+                                new_scne_parts[loaded_key].data.load_data(loaded_node['data'])
+                                string_list.append(new_scne_parts[loaded_key].data.data_type)
+                                string_list.append(new_scne_parts[loaded_key].data.parent_name)
+                        # Fix missing transform nodes for new model parts
+                        if (b'|model' in new_scne_parts):
+                            for scne_node in scne_parts.values():
+                                if (scne_node.data.data_type == b'shape') and (scne_node.data.parent_name == b''):
+                                    scne_node.data.parent_name = b'|model'
+                        # Merge nodes that weren't found in existing nodes from SCNE.json
+                        scne_parts.update(new_scne_parts)
+                        # Fix missing transform string
+                        string_list.append(b'transform')
+                
+                scne_nodes_entry.children = list(scne_parts.values())
                 scne_nodes_entry.sort(True)
                 # if '[NODES]' in loaded_dict['SCNE'].keys():
                 #     scne_nodes = []
@@ -735,13 +771,13 @@ class ImportTask(Task):
                     if spr_data_entry != None:
                         spr['TX2D'].entries.append(spr_data_entry)
             string_list.extend(texture_names)
-        
+
         self.sort_entries(spr, spr_object)
         self.build_ram_data(spr, spr_object)
 
         # Remove duplicates from string table and build it
         string_list = natsorted(list(set(string_list)))
-        spr_object.string_table.build(string_list, 1)
+        spr_object.string_table.build(string_list)
         self.data['spr'] = spr_object
 
         self.send_progress(80)
@@ -885,6 +921,7 @@ class ImportTask(Task):
 
         string_list.append(b'DbzEdgeInfo')
         shape_object = SHAP('', b'DbzEdgeInfo', spr_object.string_table)
+        shape_object.source_type = b'map1'
         if shap_data and 'DbzEdgeInfo' in shap_data.keys():
             shape_object.load_data(shap_data['DbzEdgeInfo'])
             if shape_object.source_name != b'':
