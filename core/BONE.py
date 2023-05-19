@@ -20,7 +20,7 @@ class BONE:
     def get_size(self, include_entries = True):
         size = self.info_entry_size
         if include_entries:
-            size += BONE_DATA.entry_size * len(self.bone_entries)
+            size += ut.add_padding(BONE_DATA.entry_size * len(self.bone_entries))
             # transforms size
             size += (BONE_DATA.transform_size * 3) * len(self.bone_entries)
             # raw data size
@@ -40,16 +40,22 @@ class BONE:
         self.unknown0x00 = ut.b2i(stream.read(4))
         self.joint_count = ut.b2i(stream.read(4))
         self.unknown0x08 = ut.b2i(stream.read(4))
+        # Offsets fix for ZB ram dumps
+        self.memory_offset = 0
         self.offset = ut.b2i(stream.read(4))
-        self.rel_transform_offset = ut.b2i(stream.read(4))
-        self.abs_transform_offset = ut.b2i(stream.read(4))
-        self.inv_transform_offset = ut.b2i(stream.read(4))
-        self.hierarchy_data_offset = ut.b2i(stream.read(4))
+        if (self.offset != self.info_entry_size):
+            self.memory_offset = self.offset - self.info_entry_size
+            self.offset = self.info_entry_size
+        self.rel_transform_offset = ut.b2i(stream.read(4)) - self.memory_offset
+        self.abs_transform_offset = ut.b2i(stream.read(4)) - self.memory_offset
+        self.inv_transform_offset = ut.b2i(stream.read(4)) - self.memory_offset
+        self.hierarchy_data_offset = ut.b2i(stream.read(4)) - self.memory_offset
         self.unknown0x20 = ut.b2i(stream.read(4))
 
         name_list = []
         for i in range(self.joint_count):
             bone_entry = BONE_DATA(self.bone_string_table)
+            bone_entry.memory_offset = self.memory_offset
             bone_entry.base_offset = self.base_offset
             bone_entry.read(stream)
             name_list.append(bone_entry.name)
@@ -234,26 +240,26 @@ class BONE_DATA:
 
     def read(self, stream):
         self.index = ut.b2i(stream.read(4))
-        self.name_offset = ut.b2i(stream.read(4))
+        self.name_offset = ut.b2i(stream.read(4)) - self.memory_offset
         self.name = ut.read_until(stream, self.base_offset + self.name_offset)
 
         self.child_count = ut.b2i(stream.read(4))
-        self.children_offset = ut.b2i(stream.read(4))
+        self.children_offset = ut.b2i(stream.read(4)) - self.memory_offset
 
         resume_offset = stream.tell()
         if self.child_count > 0:
             stream.seek(self.base_offset + self.children_offset)
             for i in range (self.child_count):
-                child_offset = ut.b2i(stream.read(4))
+                child_offset = ut.b2i(stream.read(4)) - self.memory_offset
                 next_child_offset = stream.tell()
                 stream.seek(self.base_offset + child_offset + 4)
-                child_name_offset = ut.b2i(stream.read(4))
+                child_name_offset = ut.b2i(stream.read(4)) - self.memory_offset
                 child_name = ut.read_until(stream, self.base_offset + child_name_offset)
                 self.children_names.append(child_name)
                 stream.seek(next_child_offset)
         
         stream.seek(resume_offset)
-        self.rel_transform_offset = ut.b2i(stream.read(4))
+        self.rel_transform_offset = ut.b2i(stream.read(4)) - self.memory_offset
         stream.seek(self.base_offset + self.rel_transform_offset)
         self.rel_transform = np.array([
             struct.unpack('>ffff', stream.read(16)),
@@ -263,7 +269,7 @@ class BONE_DATA:
         ]).transpose()
 
         stream.seek(resume_offset + 4)
-        self.abs_transform_offset = ut.b2i(stream.read(4))
+        self.abs_transform_offset = ut.b2i(stream.read(4)) - self.memory_offset
         stream.seek(self.base_offset + self.abs_transform_offset)
         self.abs_transform = np.array([
             struct.unpack('>ffff', stream.read(16)),
@@ -273,7 +279,7 @@ class BONE_DATA:
         ]).transpose()
 
         stream.seek(resume_offset + 8)
-        self.inv_transform_offset = ut.b2i(stream.read(4))
+        self.inv_transform_offset = ut.b2i(stream.read(4)) - self.memory_offset
         stream.seek(self.base_offset + self.inv_transform_offset)
         self.inv_transform = np.array([
             struct.unpack('>ffff', stream.read(16)),
@@ -384,6 +390,7 @@ class BONE_INFO:
             self.type = type
         self.name = name
         self.data_size = size
+        self.has_padding = True
     
     def get_size(self, specific_include = True):
         return len(self.data)

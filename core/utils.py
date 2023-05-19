@@ -32,6 +32,7 @@ def search_index_dict_list(dict, search_val):
     for key, search_list in dict.items():
         if (isinstance(search_list, list) and (search_val in search_list)):
             return key
+    raise KeyError("Key not found in dict: " + str(search_val))
 
 def keep_cursor_pos(function):
     """

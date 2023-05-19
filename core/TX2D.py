@@ -59,7 +59,8 @@ class TX2D:
     def get_texture_type(self):
         if hex(self.texture_type) == '0x8000000':
             return 'DXT1'
-        elif (hex(self.texture_type) == '0x18000000'):
+        elif (hex(self.texture_type) in ['0x27800000', '0x18000000']):
+            # Adding 0x27800000 for ZB support
             return 'DXT5'
         elif (hex(self.texture_type) == '0x20000000'):
             if cm.selected_platform == 'x360':

@@ -70,11 +70,11 @@ class VBUF:
         self.unknown0x16 = 0
         self.data = {}
         self.vertex_decl = []
-        if cm.selected_game == 'dbut':
+        if cm.selected_game in ['dbut', 'dbzb']:
             self.info_size = 40
 
     def get_size(self, include_vertex_decl = True):
-        size = self.info_size
+        size = ut.add_padding(self.info_size)
         if include_vertex_decl:
             size += len(self.vertex_decl) * self.vertex_decl_size
         return size
@@ -86,15 +86,15 @@ class VBUF:
         self.unknown0x04 = ut.b2i(stream.read(4))
         self.ioram_data_offset = ut.b2i(stream.read(4))
         self.ioram_data_size = ut.b2i(stream.read(4))
-        if cm.selected_game == 'dbut':
-            self.index_count = ut.b2i(stream.read(4))
         self.vertex_count = ut.b2i(stream.read(4))
+        if cm.selected_game in ['dbut', 'dbzb']:
+            self.index_count = ut.b2i(stream.read(4))
         self.unknown0x14 = ut.b2i(stream.read(2))
         self.unknown0x16 = ut.b2i(stream.read(2))
         self.vertex_decl_count = ut.b2i(stream.read(2))
         self.vertex_decl_count_2 = ut.b2i(stream.read(2))
         self.vertex_decl_offset = ut.b2i(stream.read(4))
-        if cm.selected_game == 'dbut':
+        if cm.selected_game in ['dbut', 'dbzb']:
             self.ioram_index_offset = ut.b2i(stream.read(4))
         if read_data:
             self.read_data(stream)
@@ -129,14 +129,14 @@ class VBUF:
         stream.write(ut.i2b(self.ioram_data_offset))
         stream.write(ut.i2b(len(self.ioram_data)))
         stream.write(ut.i2b(self.vertex_count))
-        if cm.selected_game == 'dbut':
+        if cm.selected_game in ['dbut', 'dbzb']:
             stream.write(ut.i2b(self.index_count))
         stream.write(ut.i2b(self.unknown0x14, 2))
         stream.write(ut.i2b(self.unknown0x16, 2))
         stream.write(ut.i2b(self.vertex_decl_count, 2))
         stream.write(ut.i2b(self.vertex_decl_count_2, 2))
         stream.write(ut.i2b(self.vertex_decl_offset))
-        if cm.selected_game == 'dbut':
+        if cm.selected_game in ['dbut', 'dbzb']:
             stream.write(ut.i2b(self.ioram_index_offset))
         if write_data:
             return self.write_data(stream)
@@ -158,7 +158,7 @@ class VBUF:
 
     def load_data(self):       
         self.vertex_count = len(self.data['positions'][0]['data'])
-        if cm.selected_game == 'dbut':
+        if cm.selected_game in ['dbut', 'dbzb']:
             self.index_count = len(self.face_indices)
         ioram_stream = BytesIO()
         vertex_usages = {}
@@ -242,7 +242,7 @@ class VBUF:
                 format = decl['vertex_format']
                 data_type = 'float' if 'f' in format else 'int'
                 chunk_size = len(format) * self.format_size[format[0]]
-                vertex_format = ut.search_index_dict(self.vertex_format, format)
+                vertex_format = self.vertex_format_mapping[key]
                 stride = decl['stride']
 
                 if (previous_stride - total_chunk_size) == 0:
@@ -276,7 +276,7 @@ class VBUF:
                     highest_offset = ut.add_padding(previous_offset + (stride - total_chunk_size))
                 index += 1
 
-        if cm.selected_game == 'dbut':
+        if cm.selected_game in ['dbut', 'dbzb']:
             self.ioram_index_offset = ioram_stream.tell()
             for idx in self.face_indices:
                 idx = struct.pack(f">h", idx)
@@ -290,6 +290,7 @@ class VBUF:
         decl_data = []
 
         current_offset = 0
+        positions_data_idx = -1
         for i in range(len(self.vertex_decl)):
             unknown0x00, resource_name, vertex_usage, \
                 index, vertex_format, stride, offset = self.vertex_decl[i]
@@ -299,6 +300,9 @@ class VBUF:
                     vertex_usage_txt = self.vertex_usage[vertex_usage]
                 except Exception:
                     vertex_usage_txt = vertex_usage
+                # first VTXUSAGE_POSITION
+                if (vertex_usage == 0) and (positions_data_idx == -1):
+                    positions_data_idx = i
 
                 format = self.vertex_format[vertex_format]
                 chunk_size = len(format) * self.format_size[format[0]]
@@ -334,21 +338,17 @@ class VBUF:
                 print(e)
                 pass
 
-        if cm.selected_game == 'dbut':
+        if cm.selected_game in ['dbut', 'dbzb']:
             face_indices = []
-            
-            for i in range(self.vertex_count):
+
+            for i in range(self.index_count):
                 face_indices.append(
-                    struct.unpack('>h', 
-                    self.ioram_data[current_offset:current_offset + 2])[0]
+                    struct.unpack('>h', self.ioram_data[current_offset:current_offset + 2])[0]
                 )
                 current_offset += 2
 
-            for decl in decl_data:
-                new_decl_data = []
-                for index in face_indices:
-                    new_decl_data.append(decl['data'][index])
-                decl['data'] = new_decl_data
+            if (positions_data_idx != -1):
+               self.face_indices = face_indices
 
         return decl_data
 

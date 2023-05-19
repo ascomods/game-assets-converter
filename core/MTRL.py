@@ -89,11 +89,11 @@ class MTRL:
                         break
         else:
             for layer in self.layers:
-                if layer[0] not in [b'COLORMAP', b'COLORMAP0']:
+                if layer[0].upper() not in [b'COLORMAP', b'COLORMAP0']:
                     sorted_layers.append(layer)
 
             for layer in self.layers:
-                if layer[0] in [b'COLORMAP', b'COLORMAP0']:
+                if layer[0].upper() in [b'COLORMAP', b'COLORMAP0']:
                     sorted_layers.append(layer)
         
         self.layers = sorted_layers

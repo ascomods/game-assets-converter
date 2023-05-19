@@ -10,10 +10,17 @@ class_map = {
     b'SPR3': b'SPRP'
 }
 
+ext_map = {
+    'SPRP': ['.spr'],
+    'STPK': ['.pak', '.stpk'],
+    'STPZ': ['.zpak', '.stpz']
+}
+
 games = {
     'dbrb': 'DragonBall Raging Blast',
     'dbrb2': 'DragonBall Raging Blast 2',
-    'dbut': 'DragonBall Z Ultimate Tenkaichi'
+    'dbut': 'DragonBall Z Ultimate Tenkaichi',
+    'dbzb': 'DragonBall Zenkai Battle Royale'
 }
 
 platforms = {

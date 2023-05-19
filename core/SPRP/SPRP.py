@@ -2,13 +2,13 @@ import os
 import core.utils as ut
 import copy
 from natsort import natsorted
-from .TX2D import *
-from .VBUF import *
-from .MTRL import *
-from .SHAP import *
-from .SCNE import *
-from .BONE import *
-from .StringTable import StringTable
+from core.TX2D import *
+from core.VBUF import *
+from core.MTRL import *
+from core.SHAP import *
+from core.SCNE import *
+from core.BONE import *
+from core.StringTable import StringTable
 
 class SPRP:
     header_size = 64
@@ -22,6 +22,8 @@ class SPRP:
     ]
 
     def __init__(self, name, size = 0):
+        if (name.__class__.__name__ == 'str'):
+            name = ut.s2b_name(name)
         self.name = name
         self.size = size
         self.string_table = StringTable()
@@ -103,7 +105,8 @@ class SPRP:
             vram_name_offset = 0
 
         stream.write(ut.i2b(header_name_offset))
-        stream.write(ut.i2b(len(self.entries) * self.header_entry_size))
+        self.entry_info_size = ut.add_padding(len(self.entries) * self.header_entry_size)
+        stream.write(ut.i2b(self.entry_info_size))
         string_table_size_offset = stream.tell()
         stream.seek(4, os.SEEK_CUR)
         self.data_info_size = 0
@@ -120,6 +123,8 @@ class SPRP:
         
         for entry in self.entries:
             entry.write(stream)
+        # Padding after info block
+        stream.seek(ut.add_padding(stream.tell()))
         self.string_table.write(stream)
         self.info_offset = ut.add_padding(stream.tell())
         string_table_size = self.info_offset - self.string_table.offset
@@ -161,6 +166,16 @@ class SPRP:
             data[ut.b2s_name(entry.data_type)] = entry.get_data()
         
         return data
+
+    def load(self, path):
+        from .SPRPImporter import SPRPImporter
+        importer = SPRPImporter()
+        importer.start(self, path)
+
+    def save(self, path):
+        from .SPRPExporter import SPRPExporter
+        exporter = SPRPExporter()
+        exporter.start(self, path)
 
     def __repr__(self):
         return (
@@ -397,7 +412,7 @@ class SPRPDataEntry:
                 child_object.read(stream, self.data_offset)
                 self.children.append(child_object)
     
-    def write(self, stream, with_data = True, data_offset = -1, offset = -1):      
+    def write(self, stream, with_data = True, data_offset = -1, offset = -1):
         if data_offset != -1:
             self.data_offset = data_offset
         if not self.is_main_type:
@@ -412,7 +427,8 @@ class SPRPDataEntry:
         self.size = self.get_size()
         stream.write(ut.i2b(self.size))
         stream.write(ut.i2b(len(self.children)))
-        self.child_offset = self.offset + self.size
+        if len(self.children) > 0:
+            self.child_offset = self.offset + self.size
         stream.write(ut.i2b(self.child_offset))
 
         if self.is_main_type:
@@ -512,11 +528,13 @@ class SPRPDataEntry:
                 entry_list.append(self)
             elif (self.data.__class__.__name__ == self.__class__.__name__):
                 entry_list = self.data.search_entries(entry_list, criteria)
-        for child in self.children:
-            if (child.__class__.__name__ == criteria) or (ut.b2s_name(child.name) == criteria):
-                entry_list.append(child)
-            if (child.__class__.__name__ == self.__class__.__name__):
-                entry_list = child.search_entries(entry_list, criteria)
+        if (criteria != 'TX2D') and (criteria != 'MTRL'):
+            # Fix for ZB SPR files
+            for child in self.children:
+                if (child.__class__.__name__ == criteria) or (ut.b2s_name(child.name) == criteria):
+                    entry_list.append(child)
+                if (child.__class__.__name__ == self.__class__.__name__):
+                    entry_list = child.search_entries(entry_list, criteria)
         
         return entry_list
 

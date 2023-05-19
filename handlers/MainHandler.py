@@ -2,8 +2,6 @@ import os
 from io import BytesIO
 from PyQt5.QtCore import QThread
 from natsort import natsorted
-from core.STPZ import *
-from core.STPK import *
 from tasks.ImportTask import *
 from tasks.ExportTask import *
 import core.utils as ut
@@ -14,7 +12,7 @@ from PyQt5.QtCore import QUrl
 class MainHandler():
     def init(self, view_handler = None):
         self.paths = {}
-        self.data = {}
+        cm.data = {}
 
         if view_handler != None:
             self.view_handler = view_handler
@@ -30,7 +28,7 @@ class MainHandler():
                 'notify_done_action' : self.import_action
             },
             'MainWindowHandler': {
-                'notify_import_action' : self.select_input_action,
+                'notify_import_action' : self.import_action,
                 'notify_export_action' : self.export_action
             },
             'MessageWindowHandler': {
@@ -40,10 +38,10 @@ class MainHandler():
         })
         self.view_handler.load_window('MainWindowHandler')
 
-    def run_task(self, task_class, args, error_message = 'Error while processing data'):
+    def run_task(self, task_class, args = (), error_message = 'Error while processing data'):
         try:
             self.thread = QThread()
-            self.task = eval(task_class)(self.data, *args)
+            self.task = eval(task_class)(*args)
             self.task.moveToThread(self.thread)
             self.task.progress_signal.connect(
                 self.view_handler.window_handler.set_progress
@@ -68,7 +66,7 @@ class MainHandler():
             self.view_handler.load_window('ProgressWindowHandler')
 
             if callback == 'ExportTask':
-                self.run_task('ExportTask', (self.output_path,))
+                self.run_task('ExportTask')
             elif hasattr(self, f"{callback}"):
                 eval(f"self.{callback}()")
 
@@ -86,61 +84,26 @@ class MainHandler():
         
         return new_filter
 
-    def select_input_action(self, observed, args):
-		# Saving last loaded FBX file into .ini
-        last = cm.settings.value("LastFolderLoaded")
-        self.input_path = self.view_handler.open_file_dialog('folder', 
+    def import_action(self, observed, args):
+		# Saving last loaded input folder file into .ini
+        last = cm.settings.value("LastInputFolder")
+        cm.input_path = self.view_handler.open_file_dialog('folder', 
             'Select the input folder', '', False, last)
-        if not self.input_path:
+        if not cm.input_path:
             return
-        cm.settings.setValue("LastFolderLoaded", QUrl(self.input_path).toString())
-        
-        # Output files
-        last = cm.settings.value("LastSprSaved")
-        self.spr_path = self.view_handler.open_file_dialog('save-file', 
-            'Save the SPR file', 'SPR (*.spr *.pak *.zpak);;All files (*.*)', False, last)[0]
-        if not self.spr_path:
-            return
-        cm.settings.setValue("LastSprSaved", QUrl(self.spr_path).toString())
+        cm.settings.setValue("LastInputFolder", QUrl(cm.input_path).toString())
 
-        self.ioram_path = None
-        self.vram_path = None
-        if self.spr_path :
-            if self.spr_path.endswith("_s.zpak") :
-                self.ioram_path = self.spr_path[:-7] + "_i.zpak"
-                self.vram_path = self.spr_path[:-7] + "_v.zpak"
-            if self.spr_path.endswith("_s.pak"):
-                self.ioram_path = self.spr_path[:-6] + "_i.pak"
-                self.vram_path = self.spr_path[:-6] + "_v.pak"
-            if self.spr_path.endswith(".spr"):
-                self.ioram_path = self.spr_path[:-4] + ".ioram"
-                self.vram_path = self.spr_path[:-4] + ".vram"
+		# Saving last loaded output folder file into .ini
+        last = cm.settings.value("LastOutputFolder")
+        cm.output_path = self.view_handler.open_file_dialog('folder', 
+            'Select the output folder', '', False, last)
+        if not cm.output_path:
+            return
+        cm.settings.setValue("LastOutputFolder", QUrl(cm.output_path).toString())
 
-        if not self.ioram_path:
-            self.ioram_path = self.view_handler.open_file_dialog('save-file', 
-            'Save the IORAM file', 'IORAM (*.ioram *.pak *.zpak);;All files (*.*)')[0]
-        if not self.ioram_path:
-            return
-        
-        if not self.vram_path:
-            self.vram_path = self.view_handler.open_file_dialog('save-file', 
-            'Save the VRAM file', 'VRAM (*.vram *.pak *.zpak);;All files (*.*)')[0]
-        if not self.vram_path:
-            return
-
-        ext = self.spr_path.rsplit('.', 1)[1].lower()
-        if (ext == 'zpak') or (ext == 'pak'):
-            self.view_handler.disable_elements()
-            self.view_handler.load_window('ListWindowHandler', f"Files to include in {ext} file")
-            
-            self.files = {}
-            for path in natsorted(glob.glob(os.path.join(self.input_path, "*"))):
-                filename = os.path.basename(path)
-                filename = re.sub('^\[\d+\]', '', filename)
-                self.files[filename] = path
-            self.view_handler.set_entries('file_list_model', self.files.keys())
-            return
-        self.import_action()
+        self.view_handler.disable_elements()
+        self.view_handler.load_window('ProgressWindowHandler')
+        self.run_task('ImportTask')
 
     def add_files_action(self, observed = None, args = None):
         files = self.view_handler.open_file_dialog('file', 'Select files to add', '', True)[0]
@@ -152,143 +115,83 @@ class MainHandler():
             filename = re.sub('^\[\d+\]', '', filename)
             self.files[filename] = path
         self.view_handler.set_entries('file_list_model', self.files.keys())
-    
-    def import_action(self, observed = None, args = []):
-        if self.view_handler.window_handler.__class__.__name__ != 'MainWindowHandler':
-            self.close_action()
-
-        self.view_handler.disable_elements()
-        self.view_handler.load_window('ProgressWindowHandler')
-
-        files = []
-        for filename in args:
-            files.append(self.files[filename])
-        self.run_task('ImportTask', (self.spr_path, self.ioram_path, 
-            self.vram_path, files))
 
     def export_action(self, observed, args):
-        try:
-            ut.empty_temp_dir()
-            self.open_action()
-
-            if (('spr_stpk' in self.data.keys()) or ('spr' in self.data.keys())) and \
-               (('ioram_stpk' in self.data.keys()) or ('ioram' in self.data.keys())) and \
-               (('vram_stpk' in self.data.keys()) or ('vram' in self.data.keys())):
-                last = cm.settings.value("LastExportFolder")
-                self.output_path = self.view_handler \
-                    .open_file_dialog('folder', 'Select the destination folder', '', False, last)
-                if not self.output_path:
-                    return
-                cm.settings.setValue("LastExportFolder", QUrl(self.output_path).toString())
-
-                if len(os.listdir(self.output_path)) > 0:
-                    self.view_handler.show_message_dialog(
-                        'Folder is not empty, data may be overwritten, Proceed ?', 'question', 'ExportTask'
-                    )
-                else:
-                    self.view_handler.disable_elements()
-                    self.view_handler.load_window('ProgressWindowHandler')
-                    self.run_task('ExportTask', (self.output_path,))
-        except Exception as e:
-            self.view_handler.show_message_dialog('Error during convertion', 'critical')
-
-    def get_stpk_file(self, path):
-        stream = open(path, 'rb')
-        data_type = stream.read(4)
-        stream.close()
-        
-        stpk_object = None
-        if data_type == b'STPZ':
-            stpz_object = STPZ()
-            stpk_object = stpz_object.decompress(path)
-        elif data_type == b'STPK':
-            stpk_object = STPK()
-            stream = open(path, "rb")
-            stpk_object.read(stream)
-            stream.close()
-        return stpk_object
-    
-    def open_action(self):
         try:
             base_filter = ['ZPAK (*.zpak)', 'PAK (*.pak)', 'All files (*.*)']
 
             last = cm.settings.value("LastSprLoaded")
             filter = base_filter.copy()
             filter.insert(-1, 'SPR (*.spr)')
-            spr_path = self.view_handler.open_file_dialog('file', 'Select the SPR file',
+            cm.spr_path = self.view_handler.open_file_dialog('file', 'Select the SPR file',
                 ';;'.join(filter), False, last)[0]
-            if spr_path :
-                cm.settings.setValue("LastSprLoaded", QUrl(spr_path).adjusted(QUrl.RemoveFilename).toString())
-                self.data['spr_stpk'] = self.get_stpk_file(spr_path)
-                if self.data['spr_stpk'] == None:
-                    del self.data['spr_stpk']
-                    stream = open(spr_path, "rb")
-                    data_tag = stream.read(4)
-                    stream.seek(0)
-                    if data_tag in cm.class_map:
-                        data_tag = cm.class_map[data_tag]
-                    name = os.path.basename(spr_path)
-                    spr_object = eval(data_tag)(ut.s2b_name(name))
-                    if spr_object == None:
-                        raise Exception('Invalid file provided')
-                    else:
-                        self.data['spr'] = spr_object
-                        self.data['spr'].read(stream, 0)
-                    stream.close()
 
-                name, ext = os.path.splitext(spr_path.lower())
-                ext = ext.replace('.', '')
+            cm.ioram_path = None
+            cm.vram_path = None
+
+            if cm.spr_path:
+                cm.settings.setValue("LastSprLoaded", 
+                    QUrl(cm.spr_path).adjusted(QUrl.RemoveFilename).toString())
+                name, ext = os.path.splitext(cm.spr_path)
+                ext = ext.replace('.', '').lower()
                 base_filter = self.sort_filter(base_filter, ext)
+
+                if (len(name) >= 2):
+                    last_chars = name[-2:]
+                    if (last_chars in ['_s', '_m']):
+                        name = name[:-2]
+
+                cm.ioram_path = name
+                cm.vram_path = name
+                if ('pak' in ext):
+                    cm.ioram_path += '_i.' + ext
+                    cm.vram_path += '_v.' + ext
+                else:
+                    cm.ioram_path += '.ioram'
+                    cm.vram_path += '.vram'
+
+                if ((cm.ioram_path) and (not os.path.exists(cm.ioram_path))):
+                    cm.ioram_path = None
+                if ((cm.vram_path) and (not os.path.exists(cm.vram_path))):
+                    cm.vram_path = None
             else:
                 return
-                
-            ioram_path = None
-            vram_path = None
-            if spr_path :
-                if spr_path.endswith("_s.zpak"):
-                    ioram_path = spr_path[:-7] + "_i.zpak"
-                    vram_path = spr_path[:-7] + "_v.zpak"
-                if spr_path.endswith("_s.pak"):
-                    ioram_path = spr_path[:-6] + "_i.pak"
-                    vram_path = spr_path[:-6] + "_v.pak"
-                if spr_path.endswith(".spr"):
-                    ioram_path = spr_path[:-4] + ".ioram"
-                    vram_path = spr_path[:-4] + ".vram"
-                
-                if ((ioram_path) and (not os.path.exists(ioram_path))) :
-                    ioram_path = None
-                if ((vram_path) and (not os.path.exists(vram_path))) :
-                    vram_path = None
 
-            if ioram_path == None:
+            if (cm.selected_game == 'dbzb') and cm.spr_path.endswith("pak"):
+                cm.ioram_path = cm.spr_path
+
+            if cm.ioram_path == None:
                 filter = base_filter.copy()
                 filter.insert(-1,'IORAM (*.ioram)')
-                ioram_path = self.view_handler.open_file_dialog('file', 'Select the IORAM file',
+                cm.ioram_path = self.view_handler.open_file_dialog('file', 'Select the IORAM file',
                     ';;'.join(filter))[0]
-
-            if ioram_path:
-                self.data['ioram_stpk'] = self.get_stpk_file(ioram_path)
-                if self.data['ioram_stpk'] == None:
-                    stream = open(ioram_path, "rb")
-                    self.data['ioram'] = stream.read()
-                    stream.close()
-            else:
+            if cm.ioram_path == None:
                 return
 
-            if vram_path == None:
+            if cm.vram_path == None:
                 filter = base_filter.copy()
                 filter.insert(-1,'VRAM (*.vram)')
-                vram_path = self.view_handler.open_file_dialog('file', 'Select the VRAM file',
+                cm.vram_path = self.view_handler.open_file_dialog('file', 'Select the VRAM file',
                     ';;'.join(filter))[0]
-
-            if vram_path:
-                self.data['vram_stpk'] = self.get_stpk_file(vram_path)
-                if self.data['vram_stpk'] == None:
-                    stream = open(vram_path, "rb")
-                    self.data['vram'] = stream.read()
-                    stream.close()
-            else:
+            if cm.vram_path == None:
                 return
+
+            last = cm.settings.value("LastExportFolder")
+            cm.output_path = self.view_handler \
+                .open_file_dialog('folder', 'Select the destination folder', '', False, last)
+            if not cm.output_path:
+                return
+
+            cm.settings.setValue("LastExportFolder", QUrl(cm.output_path).toString())
+
+            if len(os.listdir(cm.output_path)) > 0:
+                self.view_handler.show_message_dialog(
+                    'Folder is not empty, data may be overwritten, Proceed ?', 'question', 'ExportTask'
+                )
+            else:
+                self.view_handler.disable_elements()
+                self.view_handler.load_window('ProgressWindowHandler')
+                self.run_task('ExportTask')
         except Exception as e:
             print(e)
             import traceback

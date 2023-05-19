@@ -1,15 +1,20 @@
-import os
+import os, shutil
+import re
+import glob
 import core.utils as ut
 import core.common as cm
-from .SPRP import SPRP
+from natsort import natsorted
+from .SPRP.SPRP import SPRP
 
 class STPK:
     header_size = 16
     entry_size = 48
     ext_to_class = {b'SPR': b'SPRP'}
 
-    def __init__(self, name = '', size = 0, add_extra_bytes = False):
+    def __init__(self, name = b'', size = 0, add_extra_bytes = False):
         self.entries = []
+        if (name.__class__.__name__ == 'str'):
+            name = ut.s2b_name(name)
         self.name = name
         self.size = size
         self.add_extra_bytes = add_extra_bytes
@@ -71,8 +76,7 @@ class STPK:
                 stream.write(bytes(4032))
             else:
                 stream.write(bytes(64))
-        if (self.entries[-1].data.__class__.__name__ != 'SPRP') and \
-           (self.entries[-1].get_size() == 0):
+        if (self.entries[-1].get_size() == 0):
             stream.write(bytes(16))
         self.write_data(stream)
 
@@ -108,8 +112,41 @@ class STPK:
                 entry_list.append(entry)
             else:
                 entry.search_entries(entry_list, criteria)
-        
         return entry_list
+
+    def load(self, path):
+        if os.path.exists(path):
+            for child_name in natsorted(os.listdir(path)):
+                child_path = os.path.join(path, child_name)
+                name = os.path.basename(child_name)
+                name = re.sub('^\[\d+\]', '', name)
+                bytes_name = ut.s2b_name(name)
+
+                if (os.path.isdir(child_path)):
+                    base_name, ext = os.path.splitext(name)
+                    entry_class = ut.search_index_dict_list(cm.ext_map, ext)
+
+                    if (entry_class != None):
+                        entry_object = eval(entry_class)(bytes_name)
+                    else:
+                        entry_object = STPKEntry(bytes_name)
+                else:
+                    entry_object = STPKEntry(bytes_name)
+                entry_object.load(child_path)
+                self.entries.append(entry_object)
+
+    def save(self, path):
+        if os.path.exists(path):
+            shutil.rmtree(path)
+        os.mkdir(path)
+
+        i = 0
+        for entry in self.entries:
+            if not (cm.selected_game == 'dbzb' and entry.name.endswith(b'ioram')):
+                if hasattr(entry, 'save'):
+                    output_path = os.path.join(path, f"[{i}]{ut.b2s_name(entry.name)}")
+                    entry.save(output_path)
+            i += 1
 
     def __str__(self):
         return (
@@ -120,7 +157,7 @@ class STPK:
         )
 
 class STPKEntry():
-    def __init__(self, name, size):
+    def __init__(self, name, size = 0):
         self.name = name
         self.size = size
     
@@ -149,6 +186,16 @@ class STPKEntry():
                 self.data.search_entries(entry_list, criteria)
 
         return entry_list
+
+    def load(self, path):
+        stream = open(path, 'rb')
+        self.data = stream.read()
+        stream.close()
+
+    def save(self, path):
+        stream = open(path, 'wb')
+        stream.write(self.data)
+        stream.close()
 
     def __repr__(self):
         return (
