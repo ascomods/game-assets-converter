@@ -23,8 +23,7 @@ import core.common as cm
 class ImportTask(Task):
     def run(self):
         try:
-            ut.empty_temp_dir()
-            ut.init_temp_dir()
+            ut.clear_temp_dir()
 
             cm.data = dict(zip(['spr', 'ioram', 'vram'], [{} for i in range(3)]))
 
@@ -61,14 +60,21 @@ class ImportTask(Task):
             if ('pak' in file_ext):
                 stpk_obj = STPK(b'', 0, add_padding)
                 stpk_obj.add_entry(full_name, data)
-                stpk_name = f"{key}_{ext[0]}.pak"
+                name = f"{key}_{ext[0]}"
 
                 if cm.selected_game == 'dbrb':
                     op_stpk_obj = STPK(b'', 0, add_padding)
-                    op_stpk_obj.add_entry(stpk_name, stpk_obj)
+                    op_stpk_obj.add_entry(name + ".pak", stpk_obj)
                     stpk_obj = op_stpk_obj
-                path = os.path.join(cm.output_path, stpk_name)
-                self.write(path, stpk_obj)
+
+                if ('zpak' in file_ext):
+                    stpz_obj = STPZ(name + ".zpak")
+                    stpz_obj.read_stpk_data(stpk_obj)
+                    path = os.path.join(cm.output_path, name + ".zpak")
+                    self.write(path, stpz_obj)
+                else:
+                    path = os.path.join(cm.output_path, name + ".pak")
+                    self.write(path, stpk_obj)
             else:
                 path = os.path.join(cm.output_path, full_name)
                 self.write(path, data)

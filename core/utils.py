@@ -131,6 +131,10 @@ def empty_temp_dir():
     if os.path.exists(path):
         shutil.rmtree(path, onerror = on_rm_error)
 
+def clear_temp_dir():
+    empty_temp_dir()
+    init_temp_dir()
+
 def on_rm_error(func, path, exc_info):
     os.chmod( path, stat.S_IWRITE )
     os.unlink( path )

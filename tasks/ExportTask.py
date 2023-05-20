@@ -9,8 +9,7 @@ from core.STPK import STPK
 class ExportTask(Task):
     def run(self):
         try:
-            ut.empty_temp_dir()
-            ut.init_temp_dir()
+            ut.clear_temp_dir()
 
             cm.data = dict(zip(['spr', 'ioram', 'vram'], [{} for i in range(3)]))
 

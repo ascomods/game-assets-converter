@@ -64,11 +64,8 @@ class MainHandler():
         if callback != None:
             self.view_handler.disable_elements()
             self.view_handler.load_window('ProgressWindowHandler')
-
-            if callback == 'ExportTask':
-                self.run_task('ExportTask')
-            elif hasattr(self, f"{callback}"):
-                eval(f"self.{callback}()")
+            eval(callback)
+            self.run_task(callback)
 
     def close_action(self, observed = None, args = None):
         self.view_handler.close_window()
@@ -85,25 +82,34 @@ class MainHandler():
         return new_filter
 
     def import_action(self, observed, args):
-		# Saving last loaded input folder file into .ini
-        last = cm.settings.value("LastInputFolder")
-        cm.input_path = self.view_handler.open_file_dialog('folder', 
-            'Select the input folder', '', False, last)
-        if not cm.input_path:
-            return
-        cm.settings.setValue("LastInputFolder", QUrl(cm.input_path).toString())
+        if cm.selected_game == 'dbzb':
+            self.view_handler.show_message_dialog(
+                f"Imports for {cm.games[cm.selected_game]} aren't supported !", 'warning')
+        else:
+            # Saving last loaded input folder file into .ini
+            last = cm.settings.value("LastInputFolder")
+            cm.input_path = self.view_handler.open_file_dialog('folder', 
+                'Select the input folder', '', False, last)
+            if not cm.input_path:
+                return
+            cm.settings.setValue("LastInputFolder", QUrl(cm.input_path).toString())
 
-		# Saving last loaded output folder file into .ini
-        last = cm.settings.value("LastOutputFolder")
-        cm.output_path = self.view_handler.open_file_dialog('folder', 
-            'Select the output folder', '', False, last)
-        if not cm.output_path:
-            return
-        cm.settings.setValue("LastOutputFolder", QUrl(cm.output_path).toString())
+            # Saving last loaded output folder file into .ini
+            last = cm.settings.value("LastOutputFolder")
+            cm.output_path = self.view_handler.open_file_dialog('folder', 
+                'Select the output folder', '', False, last)
+            if not cm.output_path:
+                return
+            cm.settings.setValue("LastOutputFolder", QUrl(cm.output_path).toString())
 
-        self.view_handler.disable_elements()
-        self.view_handler.load_window('ProgressWindowHandler')
-        self.run_task('ImportTask')
+            if len(os.listdir(cm.output_path)) > 0:
+                self.view_handler.show_message_dialog(
+                    'Folder is not empty, data may be overwritten, Proceed ?', 'question', 'ImportTask'
+                )
+            else:
+                self.view_handler.disable_elements()
+                self.view_handler.load_window('ProgressWindowHandler')
+                self.run_task('ImportTask')
 
     def add_files_action(self, observed = None, args = None):
         files = self.view_handler.open_file_dialog('file', 'Select files to add', '', True)[0]
