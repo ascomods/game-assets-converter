@@ -3,6 +3,7 @@ import shutil
 import json
 import numpy as np
 from natsort import natsorted
+from colorama import Fore, Style
 from copy import deepcopy
 from core.STPZ import *
 from core.STPK import *
@@ -638,15 +639,23 @@ class SPRPImporter:
                                     string_list.append(loaded_key)
                                     string_list.append(new_scne_parts[loaded_key].data.data_type)
                                     string_list.append(new_scne_parts[loaded_key].data.parent_name)
-                        # Fix missing transform nodes for new model parts
+                        # Fix missing root model node for new model parts if needed
+                        if ('|model' in loaded_dict['SCNE']['[NODES]']['children']) and \
+                          (b'|model' not in new_scne_parts):
+                            key = b'|model'
+                            node = loaded_dict['SCNE']['[NODES]']['children']['|model']
+                            new_scne_parts[key] = SPRPDataEntry(b'SCNE', key, spr_object.string_table)
+                            new_scne_parts[key].data = SCNE('', name, spr_object.string_table)
+                            new_scne_parts[key].data.load_data(node['data'])
+                            string_list.append(key)
+                            string_list.append(new_scne_parts[key].data.data_type)
+                            string_list.append(new_scne_parts[key].data.parent_name)
                         if (b'|model' in new_scne_parts):
                             for scne_node in scne_parts.values():
                                 if (scne_node.data.data_type == b'shape') and (scne_node.data.parent_name == b''):
                                     scne_node.data.parent_name = b'|model'
                         # Merge nodes that weren't found in existing nodes from SCNE.json
                         scne_parts.update(new_scne_parts)
-                        # Fix missing transform string
-                        string_list.append(b'transform')
 
                     # Try to keep original scene hierarchy
                     # If new nodes are found,they are inserted at the beggining
@@ -742,14 +751,19 @@ class SPRPImporter:
             for key, data in loaded_dict.items():
                 entry_type = ut.s2b_name(key)
                 if key not in spr.keys():
-                    spr[key] = SPRPEntry(spr_object.string_table, entry_type)
-                    for name, content in data.items():
-                        name = ut.s2b_name(name)
-                        string_list.append(name)
-                        spr_data_entry = \
-                            SPRPDataEntry(entry_type, name, spr_object.string_table, True)
-                        spr_data_entry.data = content['data'].encode('latin-1')
-                        spr[key].entries.append(spr_data_entry)
+                    try:
+                        spr[key] = SPRPEntry(spr_object.string_table, entry_type)
+                        for name, content in data.items():
+                            name = ut.s2b_name(name)
+                            string_list.append(name)
+                            spr_data_entry = \
+                                SPRPDataEntry(entry_type, name, spr_object.string_table, True)
+                            spr_data_entry.data = content['data'].encode('latin-1')
+                            spr[key].entries.append(spr_data_entry)
+                    except Exception as e:
+                        print(f"{Fore.YELLOW}Warning: Error in {key} JSON, file won't be imported.")
+                        print(e)
+                        print(Style.RESET_ALL)
         else:
             spr = {
                 'TX2D': SPRPEntry(spr_object.string_table, b'TX2D')

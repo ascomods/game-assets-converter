@@ -31,6 +31,7 @@ observed: 0.5.3
 PyQt5: 5.10.1
 QtAwesome: 1.1.0
 lxml: 4.9.2
+colorama: 0.4.6
 FBX Python SDK: 2020.2.1 (provided in the libs folder)
 Wine for linux support (tested with 8.1, might work with earlier versions)
 ```

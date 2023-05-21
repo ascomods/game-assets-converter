@@ -13,6 +13,7 @@ from .BMP import BMP
 from .DDS import DDS
 from .XML import XML
 from sys import platform
+from colorama import Fore, Style
 
 class FBX:
     remove_triangle_strip = True
@@ -474,6 +475,15 @@ class FBX:
                         nb_tmp = len(blend_by_vertex[vertex_indices[j]])
                         nb_bone_layer = nb_tmp if (nb_tmp > nb_bone_layer) else nb_bone_layer
 
+            if (nb_bone_layer > 4):
+                print(f"{Fore.YELLOW}\nWarning: Too many bones rigged at same vertex for mesh '{name}'.\n"
+                      f"At least one vertex is mapped to {nb_bone_layer} bone(s).\n"
+                      f"Only 4 bone layers will be kept (max for raging blast games).\n{Style.RESET_ALL}")
+
+        # Fix bone layers amount to avoid in-game crashes
+        if (nb_bone_layer > 4):
+            nb_bone_layer = 4
+
         # TODO look values (in xeno convertion by v_copy.setColorFromRGBAFloat((float)color.mRed, (float)color.mGreen, (float)color.mBlue, (float)color.mAlpha))
         layers_dict = {
             'color': self.retrieve_layers_data(colors_layers, [0, 0, 0, 1.0]),
@@ -540,7 +550,7 @@ class FBX:
 
         # ------------------------------------------------ 
         # Transform Triangle list -> Triangle Strip 
-        # ------------------------------------------------ 
+        # ------------------------------------------------
 
         # Using NviTriStripper to generate the strip indices then build the strip
         flat_tri = sum(faces_triangles, [])
