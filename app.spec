@@ -8,7 +8,7 @@ a = Analysis(['app.py'],
 		'venv\\Lib\\site-packages'
 	     ],
              binaries=[( 'misc', '.' )],
-             datas= [],
+             datas= [( 'ui\\resources', 'ui\\resources' )],
              hiddenimports=['fbx', 'FbxCommon', 'fbxsip'],
              hookspath=[],
              hooksconfig={},

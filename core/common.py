@@ -4,7 +4,8 @@ from PyQt5 import QtCore
 
 settings = QSettings("settings.ini", QSettings.IniFormat)
 app_path = os.path.dirname(os.path.realpath(sys.argv[0]))
-temp_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'temp'))
+run_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+temp_path = os.path.join(run_path, 'temp')
 
 class_map = {
     b'SPR3': b'SPRP'
@@ -38,6 +39,10 @@ use_blender = eval(use_blender.title()) if (use_blender != None) else False
 use_debug_mode = settings.value("Debug")
 use_debug_mode = eval(use_debug_mode.title()) if (use_debug_mode != None) else False
 
-stylesheet = QtCore.QFile(os.path.join("ui", "resources", "app.qss"))
+stylesheet_path = os.path.join('ui', 'resources', 'app.qss')
+if (not os.path.exists(stylesheet_path)):
+    stylesheet_path = os.path.join(run_path, 'ui', 'resources', 'app.qss')
+
+stylesheet = QtCore.QFile(stylesheet_path)
 if stylesheet.open(QtCore.QIODevice.ReadOnly):
     stylesheet = stylesheet.readAll().data().decode()

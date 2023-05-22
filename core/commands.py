@@ -1,9 +1,11 @@
 import os, stat
+import shutil
 import subprocess
+import core.common as cm
 
 base_paths = [
     '',
-    os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'misc'))
+    os.path.join(cm.run_path, 'misc')
 ]
 
 paths = {
@@ -14,7 +16,7 @@ paths = {
 def dbrb_compressor(input_path, output_path):
     for base_path in base_paths:
         exe_path = os.path.join(base_path, paths['dbrb_compressor'])
-        if os.path.exists(exe_path):
+        if (shutil.which(exe_path) != None):
             subprocess.run([
                 exe_path,
                 input_path,
@@ -27,8 +29,8 @@ def dbrb_compressor(input_path, output_path):
 def nvtri_stripper(input_path, output_path):
     for base_path in base_paths:
         exe_path = os.path.join(base_path, paths['nvtri_stripper'])
-        if os.path.exists(exe_path):
-            status_code = subprocess.run([
+        if (shutil.which(exe_path) != None):
+            subprocess.run([
                 exe_path,
                 input_path,
                 output_path

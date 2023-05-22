@@ -422,7 +422,8 @@ class FBX:
         # Merge all vertex informations to get just a list of vertex (more easy to deal with)
         # ------------------------------------------------ 
 
-        use_per_polygone_values = not self.use_per_vertex
+        # TODO check when this is False
+        use_per_polygone_values = True
 
         nb_layers = mesh.GetLayerCount()
         colors_layers = []

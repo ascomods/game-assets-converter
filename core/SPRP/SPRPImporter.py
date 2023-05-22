@@ -792,7 +792,7 @@ class SPRPImporter:
 
         # Remove duplicates from string table and build it
         string_list = natsorted(list(set(string_list)))
-        spr_object.string_table.build(string_list)
+        spr_object.string_table.build(string_list, 1)
         cm.data['spr'][base_name] = spr_object
 
         cm.main_handler.task.send_progress(100)

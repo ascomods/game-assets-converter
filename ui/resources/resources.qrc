@@ -5,4 +5,9 @@
   <qresource prefix="styles">
     <file>app.qss</file>
   </qresource>
+  <qresource prefix="images">
+    <file>white-checkbox-checked.svg</file>
+    <file>white-checkbox.svg</file>
+    <file>white-down-arrow.svg</file>
+  </qresource>
 </RCC>

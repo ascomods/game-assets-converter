@@ -110,11 +110,11 @@ QCheckBox::indicator {
 }
 
 QCheckBox::indicator:!checked {
-  image: url('ui/resources/white-checkbox.svg');
+  image: url(':images/white-checkbox.svg');
 }
 
 QCheckBox::indicator:checked {
-  image: url('ui/resources/white-checkbox-checked.svg');
+  image: url(':images/white-checkbox-checked.svg');
 }
 
 /* main_frame */
@@ -169,7 +169,7 @@ QComboBox::drop-down {
 }
 
 QComboBox::down-arrow {
-  image: url('ui/resources/white-down-arrow.svg');
+  image: url(':images/white-down-arrow.svg');
   width: 10px;
   margin-right: 11px;
 }
