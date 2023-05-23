@@ -46,4 +46,5 @@ pyinstaller app.spec
 
 ## Usage
 
-Check out the tutorial [here](https://www.youtube.com/watch?v=HiU3i0ZZn2I&list=PL1zfdnvxzp12kg2b_ubdOqmoTyLLE3gcY)
+Check out the Blender tutorial [here](https://www.youtube.com/watch?v=pRkBQ4UaKCI)
+Check out the 3ds max tutorial [here](https://www.youtube.com/watch?v=HiU3i0ZZn2I&list=PL1zfdnvxzp12kg2b_ubdOqmoTyLLE3gcY)

@@ -24,9 +24,11 @@ class WindowHandler():
 
         # center window
         desktop_widget = QDesktopWidget()
-        x = (desktop_widget.width() - self.window.width()) / 2
-        y = (desktop_widget.height() - self.window.height()) / 2
-        self.window.move(x, y)
+        screen_number = desktop_widget.screenNumber(QtGui.QCursor.pos())
+        desktop_rect = desktop_widget.screenGeometry(screen_number)
+        x = (desktop_rect.width() - self.window.width()) / 2
+        y = (desktop_rect.height() - self.window.height()) / 2
+        self.window.move(x + desktop_rect.left(), y + desktop_rect.top())
 
         # make window moveable
         if hasattr(self.ui, 'title_frame'):

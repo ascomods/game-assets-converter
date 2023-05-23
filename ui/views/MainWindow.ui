@@ -115,7 +115,7 @@
            <string notr="true"/>
           </property>
           <property name="text">
-           <string>Game Assets Converter v3.1.1</string>
+           <string>Game Assets Converter v3.1.2</string>
           </property>
          </widget>
          <widget class="QFrame" name="title_btns_frame">
