@@ -2,7 +2,7 @@
 
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 
-*Copyright © 2021-2023 Ascomods*
+*Copyright © 2021-2024 Ascomods*
 
 ## Description
 
@@ -35,11 +35,39 @@ colorama: 0.4.6
 FBX Python SDK: 2020.2.1 (provided in the libs folder)
 Wine for linux support (tested with 8.1, might work with earlier versions)
 ```
+
+Init a python virtual environment:
+```
+python -m venv venv
+```
+
+Switch to the python virtual environment:
+
+Linux:
+```
+source venv/bin/activate
+```
+Windows:
+```
+env/Scripts/activate.bat
+```
+
 Install libraries using pip:
 ```
 pip install -r requirements.txt
 ```
-Build using PyInstaller:
+
+Copy the 3 fbx lib files (located in `libs/fbx/linux/` or `libs/fbx/windows/`) in:
+```
+venv/lib/python3.7/site-packages/
+```
+
+Now you can run the program with:
+```
+python app.py
+```
+
+Generate a build using PyInstaller:
 ```
 pyinstaller app.spec
 ```
