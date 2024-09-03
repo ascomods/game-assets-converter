@@ -41,7 +41,7 @@ Init a python virtual environment:
 python -m venv venv
 ```
 
-Switch to the python virtual environment:
+Switch into the virtual environment:
 
 Linux:
 ```
@@ -49,7 +49,7 @@ source venv/bin/activate
 ```
 Windows:
 ```
-env/Scripts/activate.bat
+venv/Scripts/activate.bat
 ```
 
 Install libraries using pip:
@@ -57,9 +57,15 @@ Install libraries using pip:
 pip install -r requirements.txt
 ```
 
-Copy the 3 fbx lib files (located in `libs/fbx/linux/` or `libs/fbx/windows/`) in:
+Copy the 3 fbx lib files:
+
+Linux (files in `libs/fbx/linux/`) into:
 ```
 venv/lib/python3.7/site-packages/
+```
+Windows (files in `libs/fbx/windows/`) into:
+```
+venv/Lib/site-packages/
 ```
 
 Now you can run the program with:
@@ -67,12 +73,21 @@ Now you can run the program with:
 python app.py
 ```
 
-Generate a build using PyInstaller:
+To build the executable:
+
+Install PyInstaller:
+
+```
+pip install pyinstaller
+```
+Generate an executable:
 ```
 pyinstaller app.spec
 ```
+The executable will be in the `dist` folder.
 
 ## Usage
 
 Check out the Blender tutorial [here](https://www.youtube.com/watch?v=pRkBQ4UaKCI)
+
 Check out the 3ds max tutorial [here](https://www.youtube.com/watch?v=HiU3i0ZZn2I&list=PL1zfdnvxzp12kg2b_ubdOqmoTyLLE3gcY)
